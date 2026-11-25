@@ -1,6 +1,7 @@
 {
   "epoch_id": 1,
   "schema_id": 1,
+  "root_hex": "3a13ec533a21aec0bbf1369113311a759f4a442430f9e1ecb4203a70241264fe",
   "leaf_count": 32,
   "purpose": "Cohort 1 Snapshot (32 synthetic members)",
   "members": [

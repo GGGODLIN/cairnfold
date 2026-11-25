@@ -44,30 +44,11 @@ func (r *p5LCG) intn(n int) int {
 }
 
 // Role 2 — P5 + Claim-driven P4: Stage Machine Safety, RemoveMember & Cross-Epoch Isolation
-// across deterministic seeded multi-epoch action sequences.
+// across randomized multi-action sequences of Upsert, Remove, Seal, ConfirmSnapshotVerified, and Fold.
 func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
-	// Ensure census starts OPEN (in case an earlier test left Epoch 2 frozen).
 	testing.SetOriginCaller(gateOp)
-	if census.Stage() == census.StageFrozenSnapshot {
-		curID := census.EpochCount()
-		ep, _ := census.GetEpoch(curID)
-		snap := census.ExportCanonicalSnapshot(curID)
-		lines := strings.Split(strings.TrimSpace(snap), "\n")
-		var ms []cairnfold.Member
-		for _, ln := range lines {
-			if strings.HasPrefix(ln, "#") || strings.HasPrefix(ln, "index,") || ln == "" {
-				continue
-			}
-			ps := strings.Split(ln, ",")
-			w, _ := strconv.ParseUint(ps[2], 10, 64)
-			ms = append(ms, cairnfold.Member{Addr: address(ps[1]), Weight: w, Role: ps[3]})
-		}
-		if len(ms) != ep.LeafCount {
-			t.Fatalf("failed to reconstruct frozen epoch %d", curID)
-		}
-		canary := makeTokenForTest(t, curID, ms, 0)
-		census.ConfirmSnapshotVerified(cross(cur), curID, "https://example.com/cleanup.json", canary)
-		census.FoldRoster(cross(cur), curID)
+	if census.Stage() != census.StageOpen {
+		t.Fatalf("expected census to start OPEN, got %s", census.Stage())
 	}
 
 	rng := &p5LCG{state: 2026112505}
@@ -81,102 +62,145 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 		testutils.TestAddress("p5_u5"),
 		testutils.TestAddress("p5_u6"),
 	}
-	appliedMutations := 0
-	rejectedMutations := 0
+	draft := make(map[string]cairnfold.Member)
+	var frozenID uint64
+	var frozenSorted []cairnfold.Member
+	var frozenTokens []string
+	frozenVerified := false
 
-	// Run 4 seeded epochs exercising UpsertMember, RemoveMember, SealEpoch, invalid frozen ops, and FoldRoster.
-	for round := 0; round < 4; round++ {
+	appliedOps := 0
+	rejectedOps := 0
+
+	// Randomly choose among all 5 lifecycle actions (0=Upsert, 1=Remove, 2=Seal, 3=Confirm, 4=Fold)
+	// until at least 3 full epochs have been sealed, verified, and folded.
+	for step := 0; step < 120 && len(anchors) < 3; step++ {
 		testing.SetOriginCaller(gateOp)
-		if census.Stage() != census.StageOpen {
-			t.Fatalf("round %d: expected OPEN stage", round)
+		action := rng.intn(5)
+		// Bias slightly toward finishing an active frozen epoch if we've reached step > 70.
+		if step > 70 && frozenID != 0 {
+			if !frozenVerified {
+				action = 3
+			} else {
+				action = 4
+			}
 		}
-		draft := make(map[string]cairnfold.Member)
-		for step := 0; step < 8; step++ {
+
+		switch action {
+		case 0: // UpsertMember
 			addr := pool[rng.intn(len(pool))]
-			if step > 2 && rng.intn(3) == 0 {
+			m := cairnfold.Member{Addr: addr, Weight: uint64(rng.intn(500) + 10), Role: "tier_" + strconv.Itoa(len(anchors))}
+			if frozenID != 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
+					census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
+				})
+				rejectedOps++
+			} else {
+				census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
+				draft[string(addr)] = m
+				appliedOps++
+			}
+		case 1: // RemoveMember
+			addr := pool[rng.intn(len(pool))]
+			if frozenID != 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
+					census.RemoveMember(cross(cur), addr)
+				})
+				rejectedOps++
+			} else {
 				_, existed := draft[string(addr)]
 				removed := census.RemoveMember(cross(cur), addr)
 				if removed != existed {
-					t.Fatalf("round %d step %d: RemoveMember=%v want %v", round, step, removed, existed)
+					t.Fatalf("step %d: RemoveMember=%v want %v", step, removed, existed)
 				}
 				delete(draft, string(addr))
-				appliedMutations++
+				appliedOps++
+			}
+		case 2: // SealEpoch
+			if frozenID != 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
+					census.SealEpoch(cross(cur), "P5 Blocked")
+				})
+				rejectedOps++
+			} else if len(draft) == 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_EMPTY_ROSTER: cannot seal an empty roster", func() {
+					census.SealEpoch(cross(cur), "P5 Empty")
+				})
+				rejectedOps++
 			} else {
-				m := cairnfold.Member{
-					Addr:   addr,
-					Weight: uint64(rng.intn(500) + 10),
-					Role:   "tier_" + strconv.Itoa(round),
+				members := make([]cairnfold.Member, 0, len(draft))
+				for _, m := range draft {
+					members = append(members, m)
 				}
-				census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
-				draft[string(addr)] = m
-				appliedMutations++
+				frozenSorted = sortMembersLocal(members)
+				frozenID = census.SealEpoch(cross(cur), "P5 Round: "+strconv.Itoa(len(anchors)))
+				frozenTokens = make([]string, len(frozenSorted))
+				for i := range frozenSorted {
+					frozenTokens[i] = makeTokenForTest(t, frozenID, frozenSorted, i)
+				}
+				frozenVerified = false
+				appliedOps++
+			}
+		case 3: // ConfirmSnapshotVerified
+			if frozenID == 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_NOT_FROZEN: epoch is not currently frozen awaiting fold", func() {
+					census.ConfirmSnapshotVerified(cross(cur), 1, "https://example.com/noop.json", "cf1:1:0:1:"+string(pool[0])+":1:a:")
+				})
+				rejectedOps++
+			} else {
+				uri := "https://example.com/p5-epoch-" + strconv.FormatUint(frozenID, 10) + ".json"
+				census.ConfirmSnapshotVerified(cross(cur), frozenID, uri, frozenTokens[0])
+				frozenVerified = true
+				appliedOps++
+			}
+		case 4: // FoldRoster
+			if frozenID == 0 {
+				uassert.AbortsWithMessage(t, cur, "ERR_NOT_FROZEN: epoch is not currently frozen awaiting fold", func() {
+					census.FoldRoster(cross(cur), 1)
+				})
+				rejectedOps++
+			} else if !frozenVerified {
+				uassert.AbortsWithMessage(t, cur, "ERR_SNAPSHOT_UNVERIFIED: call ConfirmSnapshotVerified before FoldRoster", func() {
+					census.FoldRoster(cross(cur), frozenID)
+				})
+				rejectedOps++
+			} else {
+				removed := census.FoldRoster(cross(cur), frozenID)
+				if removed != len(frozenSorted) || census.ActiveRosterSize() != 0 || census.Stage() != census.StageOpen {
+					t.Fatalf("step %d: post-fold state mismatch", step)
+				}
+				epView, ok := census.GetEpoch(frozenID)
+				if !ok {
+					t.Fatalf("step %d: GetEpoch(%d) missing", step, frozenID)
+				}
+				anchors = append(anchors, oracleAnchor{
+					id:        epView.ID,
+					rootHex:   epView.RootHex,
+					leafCount: epView.LeafCount,
+					purpose:   epView.Purpose,
+					height:    epView.SealedHeight,
+					members:   frozenSorted,
+					tokens:    frozenTokens,
+				})
+				draft = make(map[string]cairnfold.Member)
+				frozenID = 0
+				frozenSorted = nil
+				frozenTokens = nil
+				frozenVerified = false
+				appliedOps++
 			}
 		}
-		// Guarantee at least 2 members so claims and replays are exercised.
-		for len(draft) < 2 {
-			addr := pool[len(draft)]
-			m := cairnfold.Member{Addr: addr, Weight: 77, Role: "tier_" + strconv.Itoa(round)}
-			census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
-			draft[string(addr)] = m
-		}
-		if census.ActiveRosterSize() != len(draft) {
-			t.Fatalf("round %d: ActiveRosterSize=%d want %d", round, census.ActiveRosterSize(), len(draft))
-		}
 
-		roundMembers := make([]cairnfold.Member, 0, len(draft))
-		for _, m := range draft {
-			roundMembers = append(roundMembers, m)
-		}
-		sorted := sortMembersLocal(roundMembers)
-		epID := census.SealEpoch(cross(cur), "P5 Round "+strconv.Itoa(round))
-
-		// P5(a): FoldRoster MUST abort before ConfirmSnapshotVerified.
-		uassert.AbortsWithMessage(t, cur, "ERR_SNAPSHOT_UNVERIFIED: call ConfirmSnapshotVerified before FoldRoster", func() {
-			census.FoldRoster(cross(cur), epID)
-		})
-		rejectedMutations++
-		// P5(b): UpsertMember & RemoveMember MUST abort in FROZEN_SNAPSHOT.
-		uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
-			census.UpsertMember(cross(cur), pool[0], 1, "blocked")
-		})
-		uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
-			census.RemoveMember(cross(cur), pool[0])
-		})
-		rejectedMutations += 2
-
-		tokens := make([]string, len(sorted))
-		for i := range sorted {
-			tokens[i] = makeTokenForTest(t, epID, sorted, i)
-		}
-		uri := "https://example.com/p5-epoch-" + strconv.FormatUint(epID, 10) + ".json"
-		census.ConfirmSnapshotVerified(cross(cur), epID, uri, tokens[0])
-		removed := census.FoldRoster(cross(cur), epID)
-		if removed != len(sorted) || census.ActiveRosterSize() != 0 || census.Stage() != census.StageOpen {
-			t.Fatalf("round %d: post-fold state mismatch", round)
-		}
-
-		// Record immutable oracle anchor.
-		epView, ok := census.GetEpoch(epID)
-		if !ok {
-			t.Fatalf("round %d: GetEpoch(%d) missing", round, epID)
-		}
-		anchors = append(anchors, oracleAnchor{
-			id:        epView.ID,
-			rootHex:   epView.RootHex,
-			leafCount: epView.LeafCount,
-			purpose:   epView.Purpose,
-			height:    epView.SealedHeight,
-			members:   sorted,
-			tokens:    tokens,
-		})
-
-		// P5(c): Verify ALL earlier epoch anchors remain byte-identical after every new epoch!
+		// P5(c): Verify ALL earlier epoch anchors remain byte-identical after EVERY step!
 		for _, prev := range anchors {
 			got, ok := census.GetEpoch(prev.id)
 			if !ok || got.RootHex != prev.rootHex || got.LeafCount != prev.leafCount || got.Purpose != prev.purpose || got.SealedHeight != prev.height {
-				t.Fatalf("P5(c) anchor mutation detected for epoch %d", prev.id)
+				t.Fatalf("P5(c) anchor mutation detected for epoch %d at step %d", prev.id, step)
 			}
 		}
+	}
+
+	if len(anchors) < 2 {
+		t.Fatalf("expected at least 2 folded epochs in P5 randomized trace, got %d", len(anchors))
 	}
 
 	// P5(d) + Claim-driven P4: execute seeded Claim & duplicate-replay sequences against the OLDEST folded epoch.
@@ -185,7 +209,7 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 	var oracleWeight uint64
 	claimApplied := 0
 	claimBlocked := 0
-	for step := 0; step < len(oldest.members)*3; step++ {
+	for step := 0; step < len(oldest.members)*3+2; step++ {
 		idx := rng.intn(len(oldest.members))
 		m := oldest.members[idx]
 		tok := oldest.tokens[idx]
@@ -206,8 +230,8 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 			t.Fatalf("P4/P5 claim conservation mismatch at step %d: got=%+v wantCount=%d wantWeight=%d", step, st, len(oracleClaimed), oracleWeight)
 		}
 	}
-	if appliedMutations == 0 || rejectedMutations == 0 || claimApplied == 0 || claimBlocked == 0 {
-		t.Fatalf("expected non-zero applied/rejected transitions: mut=(%d,%d) claim=(%d,%d)", appliedMutations, rejectedMutations, claimApplied, claimBlocked)
+	if appliedOps == 0 || rejectedOps == 0 || claimApplied == 0 || claimBlocked == 0 {
+		t.Fatalf("expected non-zero applied/rejected transitions: ops=(%d,%d) claim=(%d,%d)", appliedOps, rejectedOps, claimApplied, claimBlocked)
 	}
 }
 

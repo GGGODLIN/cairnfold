@@ -20,8 +20,9 @@ type ClaimStats struct {
 	TotalWeightClaimed uint64
 }
 
+const censusOwnerStr = "g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0"
+
 type epochClaimState struct {
-	leafCount          int
 	bitmap             []byte
 	claimedCount       int
 	totalWeightClaimed uint64
@@ -92,8 +93,7 @@ func Claim(cur realm, token string) string {
 	st := getEpochState(tok.EpochID)
 	if st == nil {
 		st = &epochClaimState{
-			leafCount: ep.LeafCount,
-			bitmap:    make([]byte, cairnfold.BitmapSize(ep.LeafCount)),
+			bitmap: make([]byte, cairnfold.BitmapSize(ep.LeafCount)),
 		}
 		claimsByEpoch.Set(key, st)
 	}
@@ -141,31 +141,38 @@ func modeBanner() string {
 
 func Render(_ string) string {
 	var sb strings.Builder
-	ownerStr := string(census.Owner())
 	sb.WriteString("# CairnFold — Cross-Realm Claim Gate (`gate/v1`)\n\n")
-	sb.WriteString("> " + modeBanner() + " | Authoritative Producer: `gno.land/r/" + ownerStr + "/census/v1`\n\n")
+	sb.WriteString("> " + modeBanner() + " | Authoritative Producer: `gno.land/r/" + censusOwnerStr + "/census/v1` (imports only `GetEpoch`)\n\n")
 	sb.WriteString("Verifies `cf1:...` Tendermint Merkle proofs against sealed epochs in `census/v1` — even after `FoldRoster` clears the producer AVL tree — using a 1-bit-per-leaf **Epoch Bitmap** (`ceil(N/8)` bytes) instead of 32-byte per-claim nullifier maps.\n\n")
-	sb.WriteString("<gno-button href=\"/r/" + ownerStr + "/census/v1\" label=\"Back to Census Producer (census/v1)\" variant=\"outline\" />\n\n")
+	sb.WriteString("<gno-button href=\"/r/" + censusOwnerStr + "/census/v1\" label=\"Back to Census Producer (census/v1)\" variant=\"outline\" />\n\n")
 
 	sb.WriteString("## Epoch Claim & Bitmap Ledger\n\n")
-	count := census.EpochCount()
-	if count == 0 {
+	var sealed []cairnfold.EpochView
+	for id := uint64(1); ; id++ {
+		ep, ok := census.GetEpoch(id)
+		if !ok {
+			break
+		}
+		sealed = append(sealed, ep)
+	}
+	if len(sealed) == 0 {
 		sb.WriteString("_No sealed epochs available in `census/v1` yet._\n\n")
 	} else {
-		sb.WriteString("| Epoch | Leaves | Roster Folded | Claimed | Weight Claimed | Bitmap Bytes | Naive 32B Map |\n")
-		sb.WriteString("| --- | ---: | --- | ---: | ---: | ---: | ---: |\n")
-		for id := uint64(1); id <= count; id++ {
-			ep, ok := census.GetEpoch(id)
-			if !ok {
-				continue
+		sb.WriteString("| Epoch | Leaves | Snapshot | Roster Folded | Claimed | Weight Claimed | Bitmap Bytes | Naive 32B Map |\n")
+		sb.WriteString("| --- | ---: | --- | --- | ---: | ---: | ---: | ---: |\n")
+		for _, ep := range sealed {
+			st := GetClaimStats(ep.ID)
+			snapCell := "pending"
+			if ep.SnapshotURI != "" {
+				snapCell = "[snapshot](" + ep.SnapshotURI + ")"
 			}
-			st := GetClaimStats(id)
 			folded := "no"
 			if ep.Folded {
 				folded = "YES"
 			}
-			sb.WriteString("| " + strconv.FormatUint(id, 10) +
+			sb.WriteString("| " + strconv.FormatUint(ep.ID, 10) +
 				" | " + strconv.Itoa(ep.LeafCount) +
+				" | " + snapCell +
 				" | " + folded +
 				" | " + strconv.Itoa(st.ClaimedCount) +
 				" | " + strconv.FormatUint(st.TotalWeightClaimed, 10) +
@@ -180,10 +187,12 @@ func Render(_ string) string {
 	sb.WriteString("  <gno-input name=\"token\" placeholder=\"cf1:1:0:32:g1...:100:builder:...\" />\n")
 	sb.WriteString("</gno-form>\n\n")
 
-	sb.WriteString("## CLI Claim & Read-Only Check (`onyx-1`)\n\n")
+	sb.WriteString("## CLI Claim & Storage Audit (`onyx-1`)\n\n")
+	sb.WriteString("_GnoVM realms cannot query `vm/qstorage` internally; verify live deposit reclamation across both realms via `gnokey` or the published E2E receipts._\n\n")
 	sb.WriteString("```sh\n")
-	sb.WriteString("gnokey query vm/qeval -data \"gno.land/r/" + ownerStr + "/gate/v1.CheckProof(\\\"<CF1_TOKEN>\\\", \\\"<YOUR_G1_ADDR>\\\")\" -remote https://rpc.onyx.testnets.gno.land:443\n")
-	sb.WriteString("gnokey maketx call -pkgpath \"gno.land/r/" + ownerStr + "/gate/v1\" -func \"Claim\" -args \"<CF1_TOKEN>\" -gas-fee 5000ugnot -gas-wanted 5000000 -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 <YOUR_KEY>\n")
+	sb.WriteString("gnokey query vm/qeval -data \"gno.land/r/" + censusOwnerStr + "/gate/v1.CheckProof(\\\"<CF1_TOKEN>\\\", \\\"<YOUR_G1_ADDR>\\\")\" -remote https://rpc.onyx.testnets.gno.land:443\n")
+	sb.WriteString("gnokey query vm/qstorage -data \"gno.land/r/" + censusOwnerStr + "/gate/v1\" -remote https://rpc.onyx.testnets.gno.land:443\n")
+	sb.WriteString("gnokey maketx call -pkgpath \"gno.land/r/" + censusOwnerStr + "/gate/v1\" -func \"Claim\" -args \"<CF1_TOKEN>\" -gas-fee 5000ugnot -gas-wanted 5000000 -chainid onyx-1 -remote https://rpc.onyx.testnets.gno.land:443 <YOUR_KEY>\n")
 	sb.WriteString("```\n")
 	return sb.String()
 }

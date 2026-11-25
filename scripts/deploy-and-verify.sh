@@ -16,7 +16,6 @@ SNAPSHOT_BASE_URL="${CAIRNFOLD_SNAPSHOT_BASE:-https://raw.githubusercontent.com/
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --network) NETWORK="$2"; shift 2 ;;
-    --keyhome) KEYHOME="$2"; shift 2 ;;
     --out) RECEIPT_OUT="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -70,26 +69,32 @@ wait_package_live() {
   if [[ "$NETWORK" != "onyx" ]]; then
     return 0
   fi
-  echo "Waiting for $pkg to transition from inert -> live on Onyx..."
-  for _ in $(seq 1 30); do
+  echo "Waiting for $pkg to transition from inert -> live on Onyx (120s wall-clock deadline)..."
+  local deadline=$(( SECONDS + 120 ))
+  while (( SECONDS < deadline )); do
     local meta
-    meta="$("$GNOKEY" query vm/qpkgmeta_json -data "$pkg" -remote "$REMOTE" 2>&1 || true)"
+    meta="$(python3 - "$GNOKEY" "$pkg" "$REMOTE" <<'PY' || true
+import subprocess, sys
+try:
+    out = subprocess.check_output(
+        [sys.argv[1], "query", "vm/qpkgmeta_json", "-data", sys.argv[2], "-remote", sys.argv[3]],
+        stderr=subprocess.STDOUT,
+        timeout=15,
+        text=True,
+    )
+    print(out)
+except Exception as e:
+    print(str(e))
+PY
+)"
     if echo "$meta" | grep -qi '"live"'; then
       echo "  $pkg is LIVE"
       return 0
     fi
     sleep 2
   done
-  echo "Timed out waiting for $pkg to reach live state" >&2
+  echo "Timed out after 120s waiting for $pkg to reach live state" >&2
   return 1
-}
-
-extract_tx_hash() {
-  grep -Eo 'TX HASH:[[:space:]]+[^[:space:]]+' | awk '{print $NF}' | tail -n 1
-}
-
-extract_height() {
-  grep -Eo 'HEIGHT:[[:space:]]+[0-9]+' | awk '{print $NF}' | tail -n 1
 }
 
 echo "=== CairnFold E2E ($MODE_LABEL / $CHAIN_ID) ==="
@@ -210,7 +215,7 @@ fi
 
 ALICE_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print([p["token"] for p in d["proofs"] if p["addr"]==sys.argv[2]][0])' "$TMP_DIR/epoch-1-proofs.json" "$ALICE_ADDR")"
 BOB_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print([p["token"] for p in d["proofs"] if p["addr"]==sys.argv[2]][0])' "$TMP_DIR/epoch-1-proofs.json" "$BOB_ADDR")"
-EP1_ROOT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["root_hex"])' "$TMP_DIR/epoch-1-proofs.json")"
+EP1_ROOT="$ONCHAIN_ROOT"
 
 # 5. Confirm snapshot canary on-chain
 echo "Confirming snapshot canary on-chain..."
@@ -254,19 +259,25 @@ Q_GATE_AFTER_CLAIMS="$(query_storage "$PKG_GATE")"
 Q_CLAIM_STATS_EP1="$("$GNOKEY" query vm/qeval -data "${PKG_GATE}.GetClaimStats(1)" -remote "$REMOTE")"
 echo "GetClaimStats(1): $Q_CLAIM_STATS_EP1"
 
-# 9. Verify negative rejections via read-only CheckProof (zero gas, exact stage codes)
-UNCLAIMED_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["proofs"][1]["token"])' "$TMP_DIR/epoch-1-proofs.json")"
-UNCLAIMED_ADDR="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["proofs"][1]["addr"])' "$TMP_DIR/epoch-1-proofs.json")"
-TAMPERED_TOKEN="$(python3 -c 'import sys; parts=sys.argv[1].split(":"); parts[5]=str(int(parts[5])+1); print(":".join(parts))' "$UNCLAIMED_TOKEN")"
+# 9. Verify negative rejections against BOTH real Claim entrypoint AND read-only CheckProof
+#    including duplicate claim, wrong caller, and Epoch-2-only member (operator) forging Epoch 1!
+OP_FORGED_EP1_TOKEN="$(python3 - "$TMP_DIR/epoch-1-proofs.json" "$OP_ADDR" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+parts = d["proofs"][1]["token"].split(":")
+parts[4] = sys.argv[2]
+print(":".join(parts))
+PY
+)"
 
-NEG_DOUBLE="$("$GNOKEY" query vm/qeval -data "${PKG_GATE}.CheckProof(\"${ALICE_TOKEN}\", \"${ALICE_ADDR}\")" -remote "$REMOTE")"
-NEG_CALLER="$("$GNOKEY" query vm/qeval -data "${PKG_GATE}.CheckProof(\"${ALICE_TOKEN}\", \"${BOB_ADDR}\")" -remote "$REMOTE")"
-NEG_TAMPER="$("$GNOKEY" query vm/qeval -data "${PKG_GATE}.CheckProof(\"${TAMPERED_TOKEN}\", \"${UNCLAIMED_ADDR}\")" -remote "$REMOTE")"
+NEG_DOUBLE="$(printf '%s\n' "$KEYPASS" | "$GNOKEY" maketx call -pkgpath "$PKG_GATE" -func "Claim" -args "$ALICE_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -chainid "$CHAIN_ID" -remote "$REMOTE" -home "$KEYHOME" -insecure-password-stdin "$ALICE_KEY" 2>&1 || true)"
+NEG_CALLER="$(printf '%s\n' "$KEYPASS" | "$GNOKEY" maketx call -pkgpath "$PKG_GATE" -func "Claim" -args "$ALICE_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -chainid "$CHAIN_ID" -remote "$REMOTE" -home "$KEYHOME" -insecure-password-stdin "$BOB_KEY" 2>&1 || true)"
+NEG_TAMPER="$(printf '%s\n' "$KEYPASS" | "$GNOKEY" maketx call -pkgpath "$PKG_GATE" -func "Claim" -args "$OP_FORGED_EP1_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -chainid "$CHAIN_ID" -remote "$REMOTE" -home "$KEYHOME" -insecure-password-stdin "$OPERATOR_KEY" 2>&1 || true)"
 
-echo "Negative CheckProof results:"
-echo "  double-claim: $NEG_DOUBLE"
-echo "  wrong-caller: $NEG_CALLER"
-echo "  tampered:     $NEG_TAMPER"
+echo "Negative live Claim results:"
+echo "  double-claim: $(echo "$NEG_DOUBLE" | tr '\n' ' ' | head -c 220)"
+echo "  wrong-caller: $(echo "$NEG_CALLER" | tr '\n' ' ' | head -c 220)"
+echo "  ep2-only-on-ep1: $(echo "$NEG_TAMPER" | tr '\n' ' ' | head -c 220)"
 
 echo "$NEG_DOUBLE" | grep -q "ERR_ALREADY_CLAIMED"
 echo "$NEG_CALLER" | grep -q "ERR_CALLER_MISMATCH"

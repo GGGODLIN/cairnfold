@@ -1,6 +1,7 @@
 {
   "epoch_id": 2,
   "schema_id": 1,
+  "root_hex": "f51fabcb6350e9d096b60526ae1d754a1cfba184468339d879ec3357b309daf7",
   "leaf_count": 6,
   "purpose": "Cohort 2 Snapshot (Alice removed)",
   "members": [

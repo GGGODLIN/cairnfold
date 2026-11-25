@@ -82,14 +82,17 @@ func IsValidRole(role string) bool {
 	return true
 }
 
-// IsValidPurpose checks 1..64 printable ASCII bytes excluding '|' and ':'.
+// IsValidPurpose checks 1..64 printable ASCII bytes excluding '|' and leading/trailing spaces.
 func IsValidPurpose(purpose string) bool {
 	if len(purpose) == 0 || len(purpose) > 64 {
 		return false
 	}
+	if purpose[0] == ' ' || purpose[len(purpose)-1] == ' ' {
+		return false
+	}
 	for i := 0; i < len(purpose); i++ {
 		c := purpose[i]
-		if c < 0x20 || c > 0x7e || c == '|' || c == ':' {
+		if c < 0x20 || c > 0x7e || c == '|' {
 			return false
 		}
 	}

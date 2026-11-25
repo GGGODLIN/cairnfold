@@ -256,13 +256,16 @@ func parseCanonicalCSV(text string) (*Snapshot, error) {
 			continue
 		}
 		if strings.HasPrefix(ln, "#") {
-			meta := strings.TrimSpace(strings.TrimPrefix(ln, "#"))
-			// Peel trailing ",purpose=..." first so commas inside purpose cannot spoof metadata keys.
+			meta := strings.TrimPrefix(ln, "#")
+			if strings.HasPrefix(meta, " ") {
+				meta = meta[1:]
+			}
+			// Peel trailing ",purpose=..." without trimming spaces so valid purposes round-trip verbatim.
 			if before, after, ok := strings.Cut(meta, ",purpose="); ok {
-				snap.Purpose = strings.TrimSpace(after)
+				snap.Purpose = after
 				meta = before
 			} else if strings.HasPrefix(meta, "purpose=") {
-				snap.Purpose = strings.TrimSpace(strings.TrimPrefix(meta, "purpose="))
+				snap.Purpose = strings.TrimPrefix(meta, "purpose=")
 				meta = ""
 			}
 			for _, kv := range strings.Split(meta, ",") {
@@ -429,16 +432,18 @@ func WriteProofBundleAtomic(path string, bundle *ProofBundle) error {
 	return nil
 }
 
-// RunBuildProofsCLI executes `cairnproof build-proofs --input <file> --out <file> [--expected-root <hex>]`.
+// RunBuildProofsCLI executes `cairnproof build-proofs --input <file> --out <file> [--expected-root <hex>] [--allow-unverified]`.
+// By default, at least one of snapshot `root_hex` or `--expected-root` must be provided to guarantee root parity.
 func RunBuildProofsCLI(args []string) error {
 	if len(args) == 0 || args[0] != "build-proofs" {
-		return errors.New("usage: cairnproof build-proofs --input <snapshot> --out <proofs.json> [--expected-root <hex>]")
+		return errors.New("usage: cairnproof build-proofs --input <snapshot> --out <proofs.json> [--expected-root <hex>] [--allow-unverified]")
 	}
 	fs := flag.NewFlagSet("build-proofs", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	inputPath := fs.String("input", "", "path to canonical snapshot JSON or CSV")
 	outPath := fs.String("out", "", "path to write proof bundle JSON")
-	expectedRoot := fs.String("expected-root", "", "optional expected 64-char hex root from Onyx")
+	expectedRoot := fs.String("expected-root", "", "expected 64-char hex root from chain (required unless snapshot has root_hex or --allow-unverified)")
+	allowUnverified := fs.Bool("allow-unverified", false, "allow building proofs when neither snapshot root_hex nor --expected-root is supplied")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -452,6 +457,9 @@ func RunBuildProofsCLI(args []string) error {
 	snap, err := ParseCanonicalSnapshot(raw)
 	if err != nil {
 		return err
+	}
+	if !*allowUnverified && snap.RootHex == "" && strings.TrimSpace(*expectedRoot) == "" {
+		return errors.New("root parity check required: provide snapshot root_hex, --expected-root, or --allow-unverified")
 	}
 	bundle, err := BuildProofsFromSnapshot(snap, *expectedRoot)
 	if err != nil {

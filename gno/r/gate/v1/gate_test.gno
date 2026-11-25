@@ -137,9 +137,19 @@ func TestGatePostFoldCrossEpochClaimAndBitmap(cur realm, t *testing.T) {
 		t.Fatalf("unexpected ClaimStats after Bob: %+v", stats2)
 	}
 
-	// Render includes gno-form, gnokey command, bitmap stats, and mode label.
+	// Render includes gno-form, gnokey command, bitmap stats, snapshot link, and mode label.
 	md := Render("")
-	if !strings.Contains(md, "<gno-form") || !strings.Contains(md, "onyx-1") || !strings.Contains(md, "Bitmap") || !strings.Contains(md, "DETERMINISTIC_REPLAY") {
+	if !strings.Contains(md, "<gno-form") || !strings.Contains(md, "onyx-1") || !strings.Contains(md, "Bitmap") || !strings.Contains(md, "DETERMINISTIC_REPLAY") || !strings.Contains(md, "epoch-1.json") {
 		t.Fatalf("gate Render missing expected UI elements: %q", md)
 	}
+
+	// Cleanly fold Epoch 2 so subsequent tests in this package observe an OPEN census stage.
+	testing.SetOriginCaller(gateOp)
+	sorted2 := []cairnfold.Member{
+		{Addr: gateBob, Weight: 999, Role: "core_dev"},
+		{Addr: gateOp, Weight: 500, Role: "core_dev"},
+	}
+	canary2 := makeTokenForTest(t, ep2, sorted2, 0)
+	census.ConfirmSnapshotVerified(cross(cur), ep2, "https://raw.githubusercontent.com/GGGODLIN/cairnfold/main/snapshots/epoch-2.json", canary2)
+	census.FoldRoster(cross(cur), ep2)
 }

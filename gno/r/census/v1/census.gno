@@ -27,7 +27,6 @@ const (
 type epochRecord struct {
 	id               uint64
 	root             []byte
-	rootHex          string
 	leafCount        int
 	purpose          string
 	sealedHeight     int64
@@ -37,12 +36,21 @@ type epochRecord struct {
 }
 
 var (
-	owner         = DefaultOwner
-	stage         = StageOpen
-	frozenEpochID uint64
-	activeRoster  = avl.NewTree()
-	epochs        []*epochRecord
+	owner        = DefaultOwner
+	activeRoster = avl.NewTree()
+	epochs       []*epochRecord
 )
+
+func frozenEpoch() *epochRecord {
+	if len(epochs) == 0 {
+		return nil
+	}
+	last := epochs[len(epochs)-1]
+	if last.folded {
+		return nil
+	}
+	return last
+}
 
 func assertOwner(cur realm) {
 	prev := cur.Previous()
@@ -52,7 +60,7 @@ func assertOwner(cur realm) {
 }
 
 func assertOpen() {
-	if stage != StageOpen {
+	if frozenEpoch() != nil {
 		panic("ERR_STAGE_FROZEN: roster is frozen awaiting verified fold")
 	}
 }
@@ -76,7 +84,7 @@ func epochToView(ep *epochRecord) cairnfold.EpochView {
 	return cairnfold.EpochView{
 		ID:               ep.id,
 		Root:             rootCopy,
-		RootHex:          ep.rootHex,
+		RootHex:          hex.EncodeToString(ep.root),
 		LeafCount:        ep.leafCount,
 		Purpose:          ep.purpose,
 		SealedHeight:     ep.sealedHeight,
@@ -88,7 +96,12 @@ func epochToView(ep *epochRecord) cairnfold.EpochView {
 
 func Owner() address { return owner }
 
-func Stage() string { return stage }
+func Stage() string {
+	if frozenEpoch() != nil {
+		return StageFrozenSnapshot
+	}
+	return StageOpen
+}
 
 func ActiveRosterSize() int { return activeRoster.Size() }
 
@@ -175,7 +188,7 @@ func SealEpoch(cur realm, purpose string) uint64 {
 		panic("ERR_ROSTER_TOO_LARGE: roster exceeds MaxLeafCount")
 	}
 	if !cairnfold.IsValidPurpose(purpose) {
-		panic("ERR_INVALID_PURPOSE: purpose must be 1..64 printable ASCII chars without '|' or ':'")
+		panic("ERR_INVALID_PURPOSE: purpose must be 1..64 printable ASCII chars without '|' or outer spaces")
 	}
 	nextID := uint64(len(epochs)) + 1
 	members := make([]cairnfold.Member, 0, activeRoster.Size())
@@ -198,14 +211,11 @@ func SealEpoch(cur realm, purpose string) uint64 {
 	ep := &epochRecord{
 		id:           nextID,
 		root:         root,
-		rootHex:      rootHex,
 		leafCount:    len(members),
 		purpose:      purpose,
 		sealedHeight: height,
 	}
 	epochs = append(epochs, ep)
-	stage = StageFrozenSnapshot
-	frozenEpochID = nextID
 	chain.Emit(
 		"EpochSealed",
 		"epoch_id", strconv.FormatUint(nextID, 10),
@@ -222,11 +232,12 @@ func ExportCanonicalSnapshot(epochID uint64) string {
 		return "ERR_EPOCH_NOT_FOUND"
 	}
 	ep := epochs[epochID-1]
-	if stage == StageFrozenSnapshot && frozenEpochID == epochID {
+	rootHex := hex.EncodeToString(ep.root)
+	if frozen := frozenEpoch(); frozen != nil && frozen.id == epochID {
 		var sb strings.Builder
 		sb.WriteString("# epoch_id=" + strconv.FormatUint(ep.id, 10) +
 			",schema_id=1,leaf_count=" + strconv.Itoa(ep.leafCount) +
-			",root_hex=" + ep.rootHex +
+			",root_hex=" + rootHex +
 			",purpose=" + ep.purpose + "\n")
 		sb.WriteString("index,addr,weight,role\n")
 		idx := 0
@@ -241,23 +252,20 @@ func ExportCanonicalSnapshot(epochID uint64) string {
 		})
 		return sb.String()
 	}
-	if ep.snapshotURI != "" {
-		return "FOLDED: canonical snapshot archived at " + ep.snapshotURI + " (root_hex=" + ep.rootHex + ")"
-	}
-	return "FOLDED: snapshot URI unavailable (root_hex=" + ep.rootHex + ")"
+	return "FOLDED: canonical snapshot archived at " + ep.snapshotURI + " (root_hex=" + rootHex + ")"
 }
 
 // ConfirmSnapshotVerified verifies an off-chain-rebuilt canary cf1:... proof on-chain against the
 // sealed epoch anchor before unlocking FoldRoster.
 func ConfirmSnapshotVerified(cur realm, epochID uint64, snapshotURI string, canaryToken string) {
 	assertOwner(cur)
-	if stage != StageFrozenSnapshot || frozenEpochID != epochID {
+	ep := frozenEpoch()
+	if ep == nil || ep.id != epochID {
 		panic("ERR_NOT_FROZEN: epoch is not currently frozen awaiting fold")
 	}
 	if !isValidSnapshotURI(snapshotURI) {
 		panic("ERR_INVALID_URI: snapshotURI must be a valid https:// URL")
 	}
-	ep := epochs[epochID-1]
 	tok, decRes := cairnfold.DecodeProofToken(canaryToken)
 	if !decRes.OK() {
 		panic("ERR_CANARY_INVALID: " + decRes.Code + ": " + decRes.Message)
@@ -280,10 +288,10 @@ func ConfirmSnapshotVerified(cur realm, epochID uint64, snapshotURI string, cana
 // storage deposits (100 ugnot/byte) and returns the realm to OPEN for the next epoch.
 func FoldRoster(cur realm, epochID uint64) int {
 	assertOwner(cur)
-	if stage != StageFrozenSnapshot || frozenEpochID != epochID {
+	ep := frozenEpoch()
+	if ep == nil || ep.id != epochID {
 		panic("ERR_NOT_FROZEN: epoch is not currently frozen awaiting fold")
 	}
-	ep := epochs[epochID-1]
 	if !ep.snapshotVerified || ep.snapshotURI == "" {
 		panic("ERR_SNAPSHOT_UNVERIFIED: call ConfirmSnapshotVerified before FoldRoster")
 	}
@@ -297,8 +305,6 @@ func FoldRoster(cur realm, epochID uint64) int {
 	}
 	activeRoster = avl.NewTree()
 	ep.folded = true
-	frozenEpochID = 0
-	stage = StageOpen
 	chain.Emit(
 		"RosterFolded",
 		"epoch_id", strconv.FormatUint(epochID, 10),
@@ -333,7 +339,7 @@ func escapeMDCell(s string) string {
 func Render(_ string) string {
 	var sb strings.Builder
 	sb.WriteString("# CairnFold — Epoch Census Producer (`census/v1`)\n\n")
-	sb.WriteString("> " + modeBanner() + " | Stage: `" + stage + "` | Active AVL Entries: `" + strconv.Itoa(activeRoster.Size()) + "` | Sealed Epochs: `" + strconv.Itoa(len(epochs)) + "`\n\n")
+	sb.WriteString("> " + modeBanner() + " | Stage: `" + Stage() + "` | Active AVL Entries: `" + strconv.Itoa(activeRoster.Size()) + "` | Sealed Epochs: `" + strconv.Itoa(len(epochs)) + "`\n\n")
 	sb.WriteString("Seal on-chain AVL rosters into immutable Tendermint Merkle roots (`crypto/merkle`), verify an off-chain canonical snapshot canary, and call `FoldRoster` to release `100 ugnot/byte` GnoVM storage deposits while downstream `gate/v1` keeps historical epochs claimable.\n\n")
 	sb.WriteString("<gno-button href=\"/r/" + string(owner) + "/gate/v1\" label=\"Open Claim Gate (gate/v1)\" variant=\"success\" />\n\n")
 
@@ -344,7 +350,7 @@ func Render(_ string) string {
 		sb.WriteString("| Epoch | Purpose | Leaves | Root (16 hex) | Height | Snapshot | Roster Folded |\n")
 		sb.WriteString("| --- | --- | ---: | --- | ---: | --- | --- |\n")
 		for _, ep := range epochs {
-			shortRoot := ep.rootHex
+			shortRoot := hex.EncodeToString(ep.root)
 			if len(shortRoot) > 16 {
 				shortRoot = shortRoot[:16] + "..."
 			}

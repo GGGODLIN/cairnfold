@@ -16,42 +16,6 @@ const (
 	testOp    = DefaultOwner
 )
 
-func largestPow2(n int) int {
-	k := 1
-	for k*2 < n {
-		k *= 2
-	}
-	return k
-}
-
-func simpleRoot(leaves [][]byte) []byte {
-	if len(leaves) == 1 {
-		return merkle.LeafHash(leaves[0])
-	}
-	k := largestPow2(len(leaves))
-	return merkle.InnerHash(simpleRoot(leaves[:k]), simpleRoot(leaves[k:]))
-}
-
-func buildSimpleAunts(leaves [][]byte, idx int) []byte {
-	if len(leaves) <= 1 {
-		return nil
-	}
-	k := largestPow2(len(leaves))
-	if idx < k {
-		return append(buildSimpleAunts(leaves[:k], idx), simpleRoot(leaves[k:])...)
-	}
-	return append(buildSimpleAunts(leaves[k:], idx-k), simpleRoot(leaves[:k])...)
-}
-
-func testOracleAunts(epochID uint64, sorted []cairnfold.Member, idx int) []byte {
-	leaves := make([][]byte, len(sorted))
-	for i, m := range sorted {
-		b, _ := cairnfold.EncodeLeaf(epochID, m.Addr, m.Weight, m.Role)
-		leaves[i] = b
-	}
-	return buildSimpleAunts(leaves, idx)
-}
-
 func TestCensusLifecycleAndOwnerGuards(cur realm, t *testing.T) {
 	// Non-owner rejected on every write entrypoint.
 	testing.SetOriginCaller(testAlice)
@@ -106,7 +70,11 @@ func TestCensusLifecycleAndOwnerGuards(cur realm, t *testing.T) {
 	})
 
 	// Non-owner blocked on ConfirmSnapshotVerified and FoldRoster too.
+	snapURI := "https://raw.githubusercontent.com/GGGODLIN/cairnfold/main/snapshots/epoch-1.json"
 	testing.SetOriginCaller(testAlice)
+	uassert.AbortsWithMessage(t, cur, "ERR_UNAUTHORIZED: caller is not census owner", func() {
+		ConfirmSnapshotVerified(cross(cur), 1, snapURI, "cf1:1:0:2:"+string(testAlice)+":100:builder:"+strings.Repeat("00", 32))
+	})
 	uassert.AbortsWithMessage(t, cur, "ERR_UNAUTHORIZED: caller is not census owner", func() {
 		FoldRoster(cross(cur), 1)
 	})
@@ -119,17 +87,16 @@ func TestCensusLifecycleAndOwnerGuards(cur realm, t *testing.T) {
 	}
 
 	// Tampered canary rejected on ConfirmSnapshotVerified.
-	snapURI := "https://raw.githubusercontent.com/GGGODLIN/cairnfold/main/snapshots/epoch-1.json"
 	uassert.AbortsWithMessage(t, cur, "ERR_CANARY_INVALID: ERR_MERKLE_PROOF_MISMATCH: tendermint merkle proof verification failed", func() {
 		ConfirmSnapshotVerified(cross(cur), 1, snapURI, "cf1:1:0:2:"+string(testAlice)+":999:builder:"+strings.Repeat("00", 32))
 	})
 
-	// Valid canary unlocks FoldRoster.
-	sorted := []cairnfold.Member{
-		{Addr: testAlice, Weight: 100, Role: "builder"},
-		{Addr: testBob, Weight: 250, Role: "reviewer"},
+	// Valid canary unlocks FoldRoster (in a 2-leaf tree, Alice's only sibling is Bob's leaf hash).
+	bobLeaf, err := cairnfold.EncodeLeaf(1, testBob, 250, "reviewer")
+	if err != nil {
+		t.Fatalf("encode bob leaf: %v", err)
 	}
-	aunts0 := testOracleAunts(1, sorted, 0)
+	aunts0 := merkle.LeafHash(bobLeaf)
 	canary, err := cairnfold.EncodeProofToken(cairnfold.ProofToken{
 		EpochID:  1,
 		Index:    0,

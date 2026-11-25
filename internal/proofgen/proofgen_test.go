@@ -220,8 +220,13 @@ func TestBuildProofsRejectsBadInputsAndPreservesExistingOutputOnError(t *testing
 		t.Fatalf("existing valid output file was overwritten on error: got %q", string(got))
 	}
 
-	// Positive control: matching run writes valid bundle atomically.
-	if err := RunBuildProofsCLI([]string{"build-proofs", "--input", snapPath, "--out", outPath}); err != nil {
+	// Without snapshot root_hex or --expected-root, CLI refuses unless --allow-unverified is explicit.
+	if err := RunBuildProofsCLI([]string{"build-proofs", "--input", snapPath, "--out", outPath}); err == nil || !strings.Contains(err.Error(), "root parity check required") {
+		t.Fatalf("expected root parity required error, got: %v", err)
+	}
+
+	// Positive control: matching --expected-root (or --allow-unverified) writes valid bundle atomically.
+	if err := RunBuildProofsCLI([]string{"build-proofs", "--input", snapPath, "--out", outPath, "--allow-unverified"}); err != nil {
 		t.Fatalf("expected valid CLI run to succeed, got: %v", err)
 	}
 	written, err := os.ReadFile(outPath)

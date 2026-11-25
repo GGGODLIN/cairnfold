@@ -17,108 +17,108 @@
   "epoch_1_snapshot_uri": "https://raw.githubusercontent.com/GGGODLIN/cairnfold/main/snapshots/epoch-1.json",
   "claim_stats_epoch_1_raw": "height: 0\ndata: (struct{(1 uint64),(32 int),(4 int),(2 int),(350 uint64)} gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1.ClaimStats)",
   "summary_metrics": {
-    "ep1_seeded_state_above_code_bytes": 82492,
-    "ep1_folded_plus_2_claims_above_code_bytes": 4508,
-    "ep1_net_reduction_pct": 94.54,
-    "ep2_unfolded_active_roster_delta_bytes": 16396
+    "ep1_seeded_state_above_code_bytes": 82489,
+    "ep1_folded_plus_2_claims_above_code_bytes": 4332,
+    "ep1_net_reduction_pct": 94.75,
+    "ep2_unfolded_active_roster_delta_bytes": 16259
   },
   "storage_checkpoints": {
     "census_empty": {
-      "raw": "height: 0\ndata: storage: 21077, deposit: 2107700",
-      "bytes": 21077,
-      "deposit_ugnot": 2107700
+      "raw": "height: 0\ndata: storage: 21202, deposit: 2120200",
+      "bytes": 21202,
+      "deposit_ugnot": 2120200
     },
     "gate_empty": {
-      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
-      "bytes": 10933,
-      "deposit_ugnot": 1093300
+      "raw": "height: 0\ndata: storage: 11035, deposit: 1103500",
+      "bytes": 11035,
+      "deposit_ugnot": 1103500
     },
     "census_32_seeded": {
-      "raw": "height: 0\ndata: storage: 103569, deposit: 10356900",
-      "bytes": 103569,
-      "deposit_ugnot": 10356900
+      "raw": "height: 0\ndata: storage: 103691, deposit: 10369100",
+      "bytes": 103691,
+      "deposit_ugnot": 10369100
     },
     "gate_32_seeded": {
-      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
-      "bytes": 10933,
-      "deposit_ugnot": 1093300
+      "raw": "height: 0\ndata: storage: 11035, deposit: 1103500",
+      "bytes": 11035,
+      "deposit_ugnot": 1103500
     },
     "census_ep1_sealed": {
-      "raw": "height: 0\ndata: storage: 105607, deposit: 10560700",
-      "bytes": 105607,
-      "deposit_ugnot": 10560700
+      "raw": "height: 0\ndata: storage: 105580, deposit: 10558000",
+      "bytes": 105580,
+      "deposit_ugnot": 10558000
     },
     "gate_ep1_sealed": {
-      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
-      "bytes": 10933,
-      "deposit_ugnot": 1093300
+      "raw": "height: 0\ndata: storage: 11035, deposit: 1103500",
+      "bytes": 11035,
+      "deposit_ugnot": 1103500
     },
     "census_ep1_folded": {
-      "raw": "height: 0\ndata: storage: 23250, deposit: 2325000",
-      "bytes": 23250,
-      "deposit_ugnot": 2325000
+      "raw": "height: 0\ndata: storage: 23237, deposit: 2323700",
+      "bytes": 23237,
+      "deposit_ugnot": 2323700
     },
     "gate_ep1_folded": {
-      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
-      "bytes": 10933,
-      "deposit_ugnot": 1093300
+      "raw": "height: 0\ndata: storage: 11035, deposit: 1103500",
+      "bytes": 11035,
+      "deposit_ugnot": 1103500
     },
     "census_after_ep2_and_claims": {
-      "raw": "height: 0\ndata: storage: 39646, deposit: 3964600",
-      "bytes": 39646,
-      "deposit_ugnot": 3964600
+      "raw": "height: 0\ndata: storage: 39496, deposit: 3949600",
+      "bytes": 39496,
+      "deposit_ugnot": 3949600
     },
     "gate_after_2_claims": {
-      "raw": "height: 0\ndata: storage: 13268, deposit: 1326800",
-      "bytes": 13268,
-      "deposit_ugnot": 1326800
+      "raw": "height: 0\ndata: storage: 13332, deposit: 1333200",
+      "bytes": 13332,
+      "deposit_ugnot": 1333200
     }
   },
   "transactions": {
     "deploy_pure": {
-      "tx_hash": "UD8yFGxW891PYnqMkaMnW/xOe39ABNXlH4XCz8gbJ6Q=",
+      "tx_hash": "6S8ORY93e8ZJAs5PO+9UgLnivB1wRHrSf8xchhTL0S0=",
       "height": 3,
-      "gas_used": 19255551,
+      "gas_used": 19366258,
       "storage_delta_bytes": 20385,
       "storage_fee": "2038500ugnot",
       "storage_refund": null
     },
     "deploy_census": {
-      "tx_hash": "WOtwefh6MYvDNHYSGRqxGei9OJUA/EW+s/2dTZwkgtM=",
+      "tx_hash": "/CGdnFv4aDa8Bt0YUCL3hXOOmcZ2xONSAN5wKfGyzWs=",
       "height": 5,
-      "gas_used": 22307234,
-      "storage_delta_bytes": 21077,
-      "storage_fee": "2107700ugnot",
+      "gas_used": 22216033,
+      "storage_delta_bytes": 21202,
+      "storage_fee": "2120200ugnot",
       "storage_refund": null
     },
     "deploy_gate": {
-      "tx_hash": "fqMpKAUhBFV/mIB416qp0KC8RcFOJM0/Dt65LhEHTKQ=",
+      "tx_hash": "KO36XqcHwts96tZQ0l1xgWoKXp9RIdqpwTfOjxDfMBk=",
       "height": 7,
-      "gas_used": 15089786,
-      "storage_delta_bytes": 10933,
-      "storage_fee": "1093300ugnot",
+      "gas_used": 15819474,
+      "storage_delta_bytes": 11035,
+      "storage_fee": "1103500ugnot",
       "storage_refund": null
     },
     "seed_ep1": {
       "tx_hash": "iOhMq27zy6U9GdlFA3bYIivN4Ws1aNgGe/0HwskDH/c=",
       "height": 9,
-      "gas_used": 69775524,
-      "storage_delta_bytes": 82492,
-      "storage_fee": "8249200ugnot",
+      "gas_used": 69851461,
+      "storage_delta_bytes": 82489,
+      "storage_fee": "8248900ugnot",
       "storage_refund": null
     },
     "seal_ep1": {
       "tx_hash": "MAKVoYEeZzRxVq4Q4LnAdUrkXSoODQwWZ7geMcg1b8Y=",
       "height": 11,
-      "gas_used": 32399859,
-      "storage_delta_bytes": 2038,
-      "storage_fee": "203800ugnot",
+      "gas_used": 32254703,
+      "storage_delta_bytes": 1889,
+      "storage_fee": "188900ugnot",
       "storage_refund": null
     },
     "confirm_ep1": {
       "tx_hash": "Xzt2dZfGuOzVOpuPJ24mdqm08ekxCPT+AdFtSsVkL5k=",
       "height": 13,
-      "gas_used": 21037165,
+      "gas_used": 21106444,
       "storage_delta_bytes": 123,
       "storage_fee": "12300ugnot",
       "storage_refund": null
@@ -126,15 +126,15 @@
     "fold_ep1": {
       "tx_hash": "uiPr4VrXFEirDhUnyZaOU/sGN+SlHwULpK5x9HMCIr4=",
       "height": 15,
-      "gas_used": 25040595,
-      "storage_delta_bytes": -82480,
+      "gas_used": 24929848,
+      "storage_delta_bytes": -82466,
       "storage_fee": null,
-      "storage_refund": "8248000ugnot"
+      "storage_refund": "8246600ugnot"
     },
     "seed_ep2": {
       "tx_hash": "CZZTutB95BkEV8GTFRH1MFVE1ViZIpjGTOdM7lopTVw=",
       "height": 17,
-      "gas_used": 15965862,
+      "gas_used": 16259164,
       "storage_delta_bytes": 14699,
       "storage_fee": "1469900ugnot",
       "storage_refund": null
@@ -142,31 +142,31 @@
     "seal_ep2": {
       "tx_hash": "cPtZY6XcKztKi2KAPz3l1t9N7vNTgaPL189DGDoqunA=",
       "height": 19,
-      "gas_used": 10820398,
-      "storage_delta_bytes": 1697,
-      "storage_fee": "169700ugnot",
+      "gas_used": 10761568,
+      "storage_delta_bytes": 1560,
+      "storage_fee": "156000ugnot",
       "storage_refund": null
     },
     "claim_alice_ep1": {
       "tx_hash": "KSphF7H+l0rynAKyEVuKAEyrF1LVF7cTI5d7x0WZszA=",
       "height": 21,
-      "gas_used": 22518462,
-      "storage_delta_bytes": 2310,
-      "storage_fee": "231000ugnot",
+      "gas_used": 22640195,
+      "storage_delta_bytes": 2272,
+      "storage_fee": "227200ugnot",
       "storage_refund": null
     },
     "claim_bob_ep1": {
       "tx_hash": "HYTXCa/EIZlQzZdq3FDuLstjWcLwMPXZwnMSi++7wdc=",
       "height": 23,
-      "gas_used": 22678669,
+      "gas_used": 22799960,
       "storage_delta_bytes": 25,
       "storage_fee": "2500ugnot",
       "storage_refund": null
     }
   },
   "negative_checks": {
-    "double_claim": "height: 0\ndata: (\"ERR_ALREADY_CLAIMED | leaf index already claimed for this epoch | epoch=1 | index=0 | bitmap_bytes=4\" string)",
-    "wrong_caller": "height: 0\ndata: (\"ERR_CALLER_MISMATCH | caller does not match proof address | epoch=1 | index=0 | bitmap_bytes=4\" string)",
-    "tampered_leaf": "height: 0\ndata: (\"ERR_MERKLE_PROOF_MISMATCH | tendermint merkle proof verification failed | epoch=1 | index=1 | bitmap_bytes=4\" string)"
+    "double_claim": "Enter password.\nGAS WANTED: 60000000\nGAS USED:   21076266\nHEIGHT:     0\nEVENTS:     []\nINFO:       vm.version=v1.8.0, suggested gas-wanted (gas used + 5%): 22130080\nTX HASH:    \n--= Error =--\nData: ERR_ALREADY_CLAIMED: leaf index already claimed for this epoch\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - deliver transaction failed: log:msg:0,success:false,log:--= Error =--\nData: errors.FmtError{format:\"ERR_ALREADY_CLAIMED: leaf index already claimed for this epoch\", args:[]interface {}(nil)}\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - VM panic: ERR_ALREADY_CLAIMED: leaf index already claimed for this epoch\nStacktrace:\npanic: ERR_ALREADY_CLAIMED: leaf index already claimed for this epoch\nClaim at gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1/gate.gno:90\n\n\nStack Trace:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:88\n    1  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103\n    2  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1560\n    3  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1514\n    4  /Users/runner/hostedtoolcache/go/1.25.9/arm64/src/runtime/panic.go:783\n    5  /Users/runner/work/gno/gno/gnovm/pkg/gnolang/machine.go:1880\n... 28 more lines elided,events:[]\n--= /Error =--",
+    "wrong_caller": "Enter password.\nGAS WANTED: 60000000\nGAS USED:   20990397\nHEIGHT:     0\nEVENTS:     []\nINFO:       vm.version=v1.8.0, suggested gas-wanted (gas used + 5%): 22039917\nTX HASH:    \n--= Error =--\nData: ERR_CALLER_MISMATCH: caller does not match proof address\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - deliver transaction failed: log:msg:0,success:false,log:--= Error =--\nData: errors.FmtError{format:\"ERR_CALLER_MISMATCH: caller does not match proof address\", args:[]interface {}(nil)}\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - VM panic: ERR_CALLER_MISMATCH: caller does not match proof address\nStacktrace:\npanic: ERR_CALLER_MISMATCH: caller does not match proof address\nClaim at gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1/gate.gno:90\n\n\nStack Trace:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:88\n    1  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103\n    2  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1560\n    3  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1514\n    4  /Users/runner/hostedtoolcache/go/1.25.9/arm64/src/runtime/panic.go:783\n    5  /Users/runner/work/gno/gno/gnovm/pkg/gnolang/machine.go:1880\n... 28 more lines elided,events:[]\n--= /Error =--",
+    "tampered_leaf": "Enter password.\nGAS WANTED: 60000000\nGAS USED:   21656093\nHEIGHT:     0\nEVENTS:     []\nINFO:       vm.version=v1.8.0, suggested gas-wanted (gas used + 5%): 22738898\nTX HASH:    \n--= Error =--\nData: ERR_MERKLE_PROOF_MISMATCH: tendermint merkle proof verification failed\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - deliver transaction failed: log:msg:0,success:false,log:--= Error =--\nData: errors.FmtError{format:\"ERR_MERKLE_PROOF_MISMATCH: tendermint merkle proof verification failed\", args:[]interface {}(nil)}\nMsg Traces:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103 - VM panic: ERR_MERKLE_PROOF_MISMATCH: tendermint merkle proof verification failed\nStacktrace:\npanic: ERR_MERKLE_PROOF_MISMATCH: tendermint merkle proof verification failed\nClaim at gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1/gate.gno:90\n\n\nStack Trace:\n    0  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:88\n    1  /Users/runner/work/gno/gno/tm2/pkg/errors/errors.go:103\n    2  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1560\n    3  /Users/runner/work/gno/gno/gno.land/pkg/sdk/vm/keeper.go:1514\n    4  /Users/runner/hostedtoolcache/go/1.25.9/arm64/src/runtime/panic.go:783\n    5  /Users/runner/work/gno/gno/gnovm/pkg/gnolang/machine.go:1880\n... 28 more lines elided,events:[]\n--= /Error =--"
   }
 }
