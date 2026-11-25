@@ -19,9 +19,19 @@ On Gno.land, persistent realm state locks **`100 ugnot` per byte** as a storage 
 - **`gno/r/gate/v1` (downstream consumer realm)**: Imports only `census/v1.GetEpoch(epochID)` (never trusting caller-supplied roots), binds direct user caller (`cur.Previous().Address() == leaf.Addr`), verifies historical epochs even **after `FoldRoster` and newer epochs**, and tracks claims in a **`ceil(N/8)`-byte Epoch Bitmap** (`4 B` for 32 members, `125 B` for 1,000 members).
 - **`cmd/cairnproof` (offline Go CLI)**: Rebuilds Tendermint `SimpleProof` sibling hashes from any exported canonical snapshot, verifies exact root parity against chain state, and atomically writes per-member `cf1:...` tokens.
 
+## Live Onyx Testnet (`onyx-1`) Deployment
+
+All three packages are deployed on-chain on **Gno.land Onyx (`onyx-1`)** under `g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0` (`docs/onyx-deploy-receipts.json`). Because Onyx runs `code_submission_policy = "inert"`, packages automatically pass through the Onyx Gno Package Approval Service (**GPAS**) with a 1-hour activation timelock per dependency layer:
+
+| Package | On-Chain Path | Onyx Height | Tx Hash | GPAS Status |
+| --- | --- | ---: | --- | --- |
+| Pure package | `gno.land/p/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/cairnfold/v1` | `1398065` | `RPSV+mLAldIVk9uLzA4Z78M6OjfW9Z8pJbQX2YfkCvw=` | [GPAS passed](https://gpas.onyx.testnets.gno.land/?path=gno.land/p/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/cairnfold/v1) (auto-enabling `2026-11-25T10:10:02Z`) |
+| Producer realm | [`gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1`](https://onyx.testnets.gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1) | `1398165` | `HtBqVSh2IpB8qeln5QIhV78HTvPQB/ZnYJHUfKbvdnk=` | [GPAS queue](https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1) |
+| Consumer realm | [`gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1`](https://onyx.testnets.gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1) | `1398167` | `A5ELiznsa3HXX/WRQGQS4et/xxGIKA21KYpk2XCCYH8=` | [GPAS queue](https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1) |
+
 ## Measured GnoVM `v1.8.0` Storage Reclamation (`32-Member Synthetic Roster`)
 
-> Source: `docs/local-gnodev-receipts.json` (`MODE: DETERMINISTIC_REPLAY`, Gno `v1.8.0` `gnodev`, `storage_price = 100ugnot/byte`). Live Onyx `onyx-1` receipts (`MODE: LIVE`) will be recorded in `docs/onyx-e2e-receipts.json` upon testnet deployment via `scripts/deploy-and-verify.sh --network onyx`.
+> Source: `docs/local-gnodev-receipts.json` (`MODE: DETERMINISTIC_REPLAY`, Gno `v1.8.0` `gnodev`, `storage_price = 100ugnot/byte`). Live Onyx `onyx-1` E2E receipts (`MODE: LIVE`) are captured via `./scripts/deploy-and-verify.sh --network onyx --skip-deploy` once all three GPAS layers finish their automatic activation timelock.
 
 | Checkpoint | `census/v1` Storage | `gate/v1` Storage | Combined State Above Code | Deposit Delta (`100 ugnot/B`) |
 | --- | ---: | ---: | ---: | ---: |

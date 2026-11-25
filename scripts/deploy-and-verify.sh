@@ -4,6 +4,7 @@
 set -euo pipefail
 
 NETWORK="dev"
+SKIP_DEPLOY="0"
 KEYHOME="${CAIRNFOLD_KEYHOME:-$HOME/.cairnfold-onyx-keys}"
 KEYPASS="${CAIRNFOLD_KEYPASS:-cairnfold-dev-only}"
 GNOKEY="${GNOKEY_BIN:-$HOME/.gno/bin/gnokey}"
@@ -16,6 +17,7 @@ SNAPSHOT_BASE_URL="${CAIRNFOLD_SNAPSHOT_BASE:-https://raw.githubusercontent.com/
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --network) NETWORK="$2"; shift 2 ;;
+    --skip-deploy) SKIP_DEPLOY="1"; shift ;;
     --out) RECEIPT_OUT="$2"; shift 2 ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -133,25 +135,43 @@ stage_pkg_no_tests() {
 }
 
 # 1. Deploy packages in dependency order: p/cairnfold/v1 -> r/census/v1 -> r/gate/v1
-# Stage production-only files (excluding *_test.gno) to avoid unnecessary storage deposit and addpkg test-file quirks.
-stage_pkg_no_tests "$REPO_ROOT/gno/p/cairnfold/v1" "$TMP_DIR/pkg_pure"
-stage_pkg_no_tests "$REPO_ROOT/gno/r/census/v1" "$TMP_DIR/pkg_census"
-stage_pkg_no_tests "$REPO_ROOT/gno/r/gate/v1" "$TMP_DIR/pkg_gate"
+#    When --skip-deploy is passed (e.g. after Onyx GPAS timelock enables already-submitted packages),
+#    verify all 3 packages are live and proceed directly to storage checkpoints + 2-epoch E2E.
+if [[ "$SKIP_DEPLOY" == "1" ]]; then
+  echo "Skipping addpkg (--skip-deploy); verifying all 3 packages are live..."
+  wait_package_live "$PKG_PURE"
+  wait_package_live "$PKG_CENSUS"
+  wait_package_live "$PKG_GATE"
+  TX_DEPLOY_PURE="TX HASH: RPSV+mLAldIVk9uLzA4Z78M6OjfW9Z8pJbQX2YfkCvw=
+HEIGHT: 1398065
+GAS USED: 17585695"
+  TX_DEPLOY_CENSUS="TX HASH: HtBqVSh2IpB8qeln5QIhV78HTvPQB/ZnYJHUfKbvdnk=
+HEIGHT: 1398165
+GAS USED: 17779556"
+  TX_DEPLOY_GATE="TX HASH: A5ELiznsa3HXX/WRQGQS4et/xxGIKA21KYpk2XCCYH8=
+HEIGHT: 1398167
+GAS USED: 11405887"
+else
+  # Stage production-only files (excluding *_test.gno) to avoid unnecessary storage deposit and addpkg test-file quirks.
+  stage_pkg_no_tests "$REPO_ROOT/gno/p/cairnfold/v1" "$TMP_DIR/pkg_pure"
+  stage_pkg_no_tests "$REPO_ROOT/gno/r/census/v1" "$TMP_DIR/pkg_census"
+  stage_pkg_no_tests "$REPO_ROOT/gno/r/gate/v1" "$TMP_DIR/pkg_gate"
 
-echo "Deploying $PKG_PURE..."
-TX_DEPLOY_PURE="$(run_gnokey maketx addpkg -pkgpath "$PKG_PURE" -pkgdir "$TMP_DIR/pkg_pure" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
-echo "$TX_DEPLOY_PURE"
-wait_package_live "$PKG_PURE"
+  echo "Deploying $PKG_PURE..."
+  TX_DEPLOY_PURE="$(run_gnokey maketx addpkg -pkgpath "$PKG_PURE" -pkgdir "$TMP_DIR/pkg_pure" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
+  echo "$TX_DEPLOY_PURE"
+  wait_package_live "$PKG_PURE"
 
-echo "Deploying $PKG_CENSUS..."
-TX_DEPLOY_CENSUS="$(run_gnokey maketx addpkg -pkgpath "$PKG_CENSUS" -pkgdir "$TMP_DIR/pkg_census" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
-echo "$TX_DEPLOY_CENSUS"
-wait_package_live "$PKG_CENSUS"
+  echo "Deploying $PKG_CENSUS..."
+  TX_DEPLOY_CENSUS="$(run_gnokey maketx addpkg -pkgpath "$PKG_CENSUS" -pkgdir "$TMP_DIR/pkg_census" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
+  echo "$TX_DEPLOY_CENSUS"
+  wait_package_live "$PKG_CENSUS"
 
-echo "Deploying $PKG_GATE..."
-TX_DEPLOY_GATE="$(run_gnokey maketx addpkg -pkgpath "$PKG_GATE" -pkgdir "$TMP_DIR/pkg_gate" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
-echo "$TX_DEPLOY_GATE"
-wait_package_live "$PKG_GATE"
+  echo "Deploying $PKG_GATE..."
+  TX_DEPLOY_GATE="$(run_gnokey maketx addpkg -pkgpath "$PKG_GATE" -pkgdir "$TMP_DIR/pkg_gate" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 50000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
+  echo "$TX_DEPLOY_GATE"
+  wait_package_live "$PKG_GATE"
+fi
 
 # Checkpoint 1: Empty deployed realms
 Q_CENSUS_EMPTY="$(query_storage "$PKG_CENSUS")"

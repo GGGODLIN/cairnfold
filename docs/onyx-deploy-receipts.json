@@ -1,0 +1,53 @@
+{
+  "mode": "LIVE_DEPLOYED_GPAS_QUEUE",
+  "chain_id": "onyx-1",
+  "remote": "https://rpc.onyx.testnets.gno.land:443",
+  "deployed_at": "2026-11-25T09:10:00Z",
+  "deployer": "g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0",
+  "code_submission_policy": "inert",
+  "funding_transactions": {
+    "fund_alice": {
+      "to": "g104p7ldmmecudlgjt6q5ldwy25yj4t9lsxy7n9e",
+      "amount": "5000000ugnot",
+      "height": 1398062,
+      "gas_used": 1236967,
+      "tx_hash": "l1vrJmZwcOMX2yvB0K0uiatYll++xi6AJgt0XtVj3Ug="
+    },
+    "fund_bob": {
+      "to": "g1nngfjkxys8e9acal2pmk7k572gzq0fllahkyl5",
+      "amount": "5000000ugnot",
+      "height": 1398063,
+      "gas_used": 1238021,
+      "tx_hash": "+ao6Ozn/mziKmziQ03hOkG7OBGSB7Zr054yeSIiNRfU="
+    }
+  },
+  "packages": {
+    "cairnfold": {
+      "path": "gno.land/p/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/cairnfold/v1",
+      "height": 1398065,
+      "gas_used": 17585695,
+      "tx_hash": "RPSV+mLAldIVk9uLzA4Z78M6OjfW9Z8pJbQX2YfkCvw=",
+      "gpas_url": "https://gpas.onyx.testnets.gno.land/?path=gno.land/p/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/cairnfold/v1",
+      "gpas_status_observed": "passed, enabling at 2026-11-25T10:10:02Z"
+    },
+    "census": {
+      "path": "gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1",
+      "height": 1398165,
+      "gas_used": 17779556,
+      "tx_hash": "HtBqVSh2IpB8qeln5QIhV78HTvPQB/ZnYJHUfKbvdnk=",
+      "gpas_url": "https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1",
+      "gnoweb_url": "https://onyx.testnets.gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1",
+      "gpas_status_observed": "in review queue (queued behind cairnfold/v1)"
+    },
+    "gate": {
+      "path": "gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1",
+      "height": 1398167,
+      "gas_used": 11405887,
+      "tx_hash": "A5ELiznsa3HXX/WRQGQS4et/xxGIKA21KYpk2XCCYH8=",
+      "gpas_url": "https://gpas.onyx.testnets.gno.land/?path=gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1",
+      "gnoweb_url": "https://onyx.testnets.gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1",
+      "gpas_status_observed": "in review queue (queued behind census/v1)"
+    }
+  },
+  "post_enable_command": "./scripts/deploy-and-verify.sh --network onyx --skip-deploy"
+}
