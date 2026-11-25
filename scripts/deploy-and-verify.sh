@@ -386,6 +386,16 @@ if "(2 int)" not in stats_raw and "ClaimedCount: 2" not in stats_raw:
 
 op_addr = os.environ["OP_ADDR"]
 gnoweb_base = os.environ["GNOWEB_BASE"]
+def parse_neg(txt, expected_code):
+    m = re.search(rf"Data:\s*({re.escape(expected_code)}[^\n]*)", txt)
+    gu = re.search(r"GAS USED:\s*(\d+)", txt)
+    if not m:
+        raise SystemExit(f"expected {expected_code} in negative Claim output: {txt[:300]!r}")
+    return {
+        "error": m.group(1).strip(),
+        "gas_used": int(gu.group(1)) if gu else None,
+    }
+
 receipt = {
     "mode": os.environ["MODE_LABEL"],
     "chain_id": os.environ["CHAIN_ID"],
@@ -415,9 +425,9 @@ receipt = {
     "storage_checkpoints": checkpoints,
     "transactions": txs,
     "negative_checks": {
-        "double_claim": os.environ["NEG_DOUBLE"].strip(),
-        "wrong_caller": os.environ["NEG_CALLER"].strip(),
-        "tampered_leaf": os.environ["NEG_TAMPER"].strip(),
+        "double_claim": parse_neg(os.environ["NEG_DOUBLE"], "ERR_ALREADY_CLAIMED"),
+        "wrong_caller": parse_neg(os.environ["NEG_CALLER"], "ERR_CALLER_MISMATCH"),
+        "ep2_only_member_on_ep1": parse_neg(os.environ["NEG_TAMPER"], "ERR_MERKLE_PROOF_MISMATCH"),
     },
 }
 
