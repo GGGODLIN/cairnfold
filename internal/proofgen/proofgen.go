@@ -111,38 +111,6 @@ func IsValidGnoAddress(addr string) bool {
 	return bech32Polymod(values) == 1
 }
 
-// EncodeGnoAddress encodes a 20-byte raw address into canonical "g1..." bech32.
-func EncodeGnoAddress(raw20 []byte) (string, error) {
-	if len(raw20) != 20 {
-		return "", errors.New("gno address requires exactly 20 bytes")
-	}
-	// Convert 8-bit bytes to 5-bit groups (20*8 = 160 bits = 32 groups).
-	groups := make([]byte, 0, 32)
-	acc := 0
-	bits := 0
-	for _, b := range raw20 {
-		acc = (acc << 8) | int(b)
-		bits += 8
-		for bits >= 5 {
-			bits -= 5
-			groups = append(groups, byte((acc>>bits)&31))
-		}
-	}
-	values := append(bech32HRPExpand("g"), groups...)
-	values = append(values, 0, 0, 0, 0, 0, 0)
-	polymod := bech32Polymod(values) ^ 1
-	checksum := make([]byte, 6)
-	for i := 0; i < 6; i++ {
-		checksum[i] = byte((polymod >> uint(5*(5-i))) & 31)
-	}
-	var sb strings.Builder
-	sb.WriteString("g1")
-	for _, v := range append(groups, checksum...) {
-		sb.WriteByte(bech32Charset[v])
-	}
-	return sb.String(), nil
-}
-
 func leafHash(leaf []byte) []byte {
 	h := sha256.New()
 	h.Write([]byte{0x00})

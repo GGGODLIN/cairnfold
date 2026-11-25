@@ -18,6 +18,31 @@ var validAddrs = []string{
 	"g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0",
 }
 
+func encodeTestGnoAddress(raw20 []byte) string {
+	groups := make([]byte, 0, 32)
+	acc, bits := 0, 0
+	for _, b := range raw20 {
+		acc = (acc << 8) | int(b)
+		bits += 8
+		for bits >= 5 {
+			bits -= 5
+			groups = append(groups, byte((acc>>bits)&31))
+		}
+	}
+	values := append(bech32HRPExpand("g"), groups...)
+	values = append(values, 0, 0, 0, 0, 0, 0)
+	polymod := bech32Polymod(values) ^ 1
+	var sb strings.Builder
+	sb.WriteString("g1")
+	for _, v := range groups {
+		sb.WriteByte(bech32Charset[v])
+	}
+	for i := 0; i < 6; i++ {
+		sb.WriteByte(bech32Charset[(polymod>>uint(5*(5-i)))&31])
+	}
+	return sb.String()
+}
+
 func syntheticMembers(t *testing.T, count int) []Member {
 	t.Helper()
 	roles := []string{"builder", "reviewer", "core_dev", "early-bird"}
@@ -32,10 +57,7 @@ func syntheticMembers(t *testing.T, count int) []Member {
 			continue
 		}
 		sum := sha256.Sum256([]byte(fmt.Sprintf("cairnfold-synth-%d", i)))
-		addr, err := EncodeGnoAddress(sum[:20])
-		if err != nil {
-			t.Fatalf("EncodeGnoAddress(%d): %v", i, err)
-		}
+		addr := encodeTestGnoAddress(sum[:20])
 		out = append(out, Member{
 			Addr:   addr,
 			Weight: uint64(100 + i*25),
