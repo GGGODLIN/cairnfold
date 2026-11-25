@@ -1,0 +1,9 @@
+.scratch/
+.DS_Store
+*.key
+*.mnemonic
+*.env
+.env*
+gnokey-test-home/
+bin/
+dist/
