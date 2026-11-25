@@ -1,0 +1,168 @@
+{
+  "epoch_id": 1,
+  "schema_id": 1,
+  "leaf_count": 32,
+  "purpose": "Cohort 1 Snapshot (32 synthetic members)",
+  "members": [
+    {
+      "addr": "g104p7ldmmecudlgjt6q5ldwy25yj4t9lsxy7n9e",
+      "weight": 100,
+      "role": "builder"
+    },
+    {
+      "addr": "g12cdyucdqly7dd64rv9npmky8q37g7dayjglw3q",
+      "weight": 225,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1358g4k0gtlffy9l2cx4wavjp85acwl5rjh5ray",
+      "weight": 500,
+      "role": "builder"
+    },
+    {
+      "addr": "g152vc848dhkreelrjnx8qgvhpls6g3t80kmrkts",
+      "weight": 850,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g15rqtv3u0x3e05ddkgv945ahdk5ghh2c3tjsq6r",
+      "weight": 650,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g160q7ajz9ue9ty6cd8t982gcvg2r4vdzeen42we",
+      "weight": 450,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g16vtrm7stju6xkkqmqnrpev4ucppcuth6rt8fan",
+      "weight": 475,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1c4r55l3ule5wfm7a4hl4wk8xe5d0dcwvx730mw",
+      "weight": 575,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1duhm743gzva7xxpza57hkpgpcyxx0dghdrrfrv",
+      "weight": 875,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1dumsn9q05g0qc98apg5ws80fd05c20uun8qenh",
+      "weight": 600,
+      "role": "builder"
+    },
+    {
+      "addr": "g1fs984qzdrxw3nhasmwvw3mz2rc70p3frw9hu3j",
+      "weight": 425,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1hjy0t44x3qfy0kttutwmxyz055pguzez4q966c",
+      "weight": 350,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1j6tjf7hpjpkw96jz78e9kyq5g8gm4rlvh5v5eu",
+      "weight": 525,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1jhyz9yeqrrgmxj39jwdzs2n8u97f9646650v77",
+      "weight": 175,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1lhlslq345rm92zu6pfcftjte8mnt7583c2g69u",
+      "weight": 725,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1m280mj8fgnpkxmnf00u53c5lxltdp8dkly8x8t",
+      "weight": 250,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1m8zvkajq3h6n80cmtw0nkq0fwql2vfgv4fc369",
+      "weight": 275,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1mc2sw6gawqst9gulkc522q638qwjmek2w3kvm7",
+      "weight": 300,
+      "role": "builder"
+    },
+    {
+      "addr": "g1n6c437hpgxfxejmzm0yx2ud4y8d8ktgd7an22x",
+      "weight": 675,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1nngfjkxys8e9acal2pmk7k572gzq0fllahkyl5",
+      "weight": 250,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1ss9way55y9cr5a5vdz2yfj4awp0su5hksgwaxz",
+      "weight": 700,
+      "role": "builder"
+    },
+    {
+      "addr": "g1ssl83cf7vhxphkrlv3ln9r76luynl45vrj3g6t",
+      "weight": 550,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1susy5ns00ukrtkuay95pl47k06d8zmk8fdwvmy",
+      "weight": 400,
+      "role": "builder"
+    },
+    {
+      "addr": "g1t4rxtlgu9dfk4csd42pky79kvpzty6c7tlm6r2",
+      "weight": 150,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1t7vyqmgczkft02df46aye047uewwatcygmznpg",
+      "weight": 375,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1tmdn7pdfstelct9vvhteq0k4zk9mzlmjrceq3m",
+      "weight": 625,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1w692m87d4vzlac4uf6el8c7zukd4hdhl6nyxyl",
+      "weight": 825,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1wfkg7p5trl9l5rp5ttxvdgm5jm94harxdts7sc",
+      "weight": 800,
+      "role": "builder"
+    },
+    {
+      "addr": "g1wm899ypsmr8mv0dwu7lqsvsug5yks5x6gx0reh",
+      "weight": 775,
+      "role": "early-bird"
+    },
+    {
+      "addr": "g1wzexjpnm2zn2rxnv8ne9xjj7jyurv08406mvz0",
+      "weight": 325,
+      "role": "reviewer"
+    },
+    {
+      "addr": "g1yta0p50x60ygwc0hjfjcug03jyjjp7k3t236hz",
+      "weight": 750,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1zw9e9kp30aprh9fk8df0y2508qk32az45ap2ch",
+      "weight": 200,
+      "role": "builder"
+    }
+  ]
+}

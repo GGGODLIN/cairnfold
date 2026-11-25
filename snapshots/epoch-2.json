@@ -1,0 +1,38 @@
+{
+  "epoch_id": 2,
+  "schema_id": 1,
+  "leaf_count": 6,
+  "purpose": "Cohort 2 Snapshot (Alice removed)",
+  "members": [
+    {
+      "addr": "g1358g4k0gtlffy9l2cx4wavjp85acwl5rjh5ray",
+      "weight": 500,
+      "role": "builder"
+    },
+    {
+      "addr": "g152vc848dhkreelrjnx8qgvhpls6g3t80kmrkts",
+      "weight": 850,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g15rqtv3u0x3e05ddkgv945ahdk5ghh2c3tjsq6r",
+      "weight": 650,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g160q7ajz9ue9ty6cd8t982gcvg2r4vdzeen42we",
+      "weight": 450,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1nngfjkxys8e9acal2pmk7k572gzq0fllahkyl5",
+      "weight": 999,
+      "role": "core_dev"
+    },
+    {
+      "addr": "g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0",
+      "weight": 500,
+      "role": "core_dev"
+    }
+  ]
+}
