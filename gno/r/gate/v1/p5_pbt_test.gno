@@ -36,14 +36,21 @@ func sortMembersLocal(in []cairnfold.Member) []cairnfold.Member {
 	return cp
 }
 
-// Role 2 — P5: Stage Machine Safety & Cross-Epoch Isolation across multi-epoch action sequences.
+type p5LCG struct{ state uint64 }
+
+func (r *p5LCG) intn(n int) int {
+	r.state = r.state*6364136223846793005 + 1442695040888963407
+	return int(r.state % uint64(n))
+}
+
+// Role 2 — P5 + Claim-driven P4: Stage Machine Safety, RemoveMember & Cross-Epoch Isolation
+// across deterministic seeded multi-epoch action sequences.
 func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 	// Ensure census starts OPEN (in case an earlier test left Epoch 2 frozen).
 	testing.SetOriginCaller(gateOp)
 	if census.Stage() == census.StageFrozenSnapshot {
 		curID := census.EpochCount()
 		ep, _ := census.GetEpoch(curID)
-		// Parse current frozen snapshot so we can build a valid canary and fold cleanly.
 		snap := census.ExportCanonicalSnapshot(curID)
 		lines := strings.Split(strings.TrimSpace(snap), "\n")
 		var ms []cairnfold.Member
@@ -63,6 +70,7 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 		census.FoldRoster(cross(cur), curID)
 	}
 
+	rng := &p5LCG{state: 2026112505}
 	var anchors []oracleAnchor
 	pool := []address{
 		testutils.TestAddress("p5_u0"),
@@ -71,23 +79,52 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 		testutils.TestAddress("p5_u3"),
 		testutils.TestAddress("p5_u4"),
 		testutils.TestAddress("p5_u5"),
+		testutils.TestAddress("p5_u6"),
 	}
+	appliedMutations := 0
+	rejectedMutations := 0
 
-	// Run 3 complete epochs with varying subsets, mutations, and inter-epoch claims.
-	for round := 0; round < 3; round++ {
+	// Run 4 seeded epochs exercising UpsertMember, RemoveMember, SealEpoch, invalid frozen ops, and FoldRoster.
+	for round := 0; round < 4; round++ {
 		testing.SetOriginCaller(gateOp)
 		if census.Stage() != census.StageOpen {
 			t.Fatalf("round %d: expected OPEN stage", round)
 		}
-		var roundMembers []cairnfold.Member
-		for i := 0; i < 3+round; i++ {
-			idx := (i + round) % len(pool)
-			m := cairnfold.Member{
-				Addr:   pool[idx],
-				Weight: uint64((round+1)*100 + i*17),
-				Role:   "tier_" + strconv.Itoa(round),
+		draft := make(map[string]cairnfold.Member)
+		for step := 0; step < 8; step++ {
+			addr := pool[rng.intn(len(pool))]
+			if step > 2 && rng.intn(3) == 0 {
+				_, existed := draft[string(addr)]
+				removed := census.RemoveMember(cross(cur), addr)
+				if removed != existed {
+					t.Fatalf("round %d step %d: RemoveMember=%v want %v", round, step, removed, existed)
+				}
+				delete(draft, string(addr))
+				appliedMutations++
+			} else {
+				m := cairnfold.Member{
+					Addr:   addr,
+					Weight: uint64(rng.intn(500) + 10),
+					Role:   "tier_" + strconv.Itoa(round),
+				}
+				census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
+				draft[string(addr)] = m
+				appliedMutations++
 			}
+		}
+		// Guarantee at least 2 members so claims and replays are exercised.
+		for len(draft) < 2 {
+			addr := pool[len(draft)]
+			m := cairnfold.Member{Addr: addr, Weight: 77, Role: "tier_" + strconv.Itoa(round)}
 			census.UpsertMember(cross(cur), m.Addr, m.Weight, m.Role)
+			draft[string(addr)] = m
+		}
+		if census.ActiveRosterSize() != len(draft) {
+			t.Fatalf("round %d: ActiveRosterSize=%d want %d", round, census.ActiveRosterSize(), len(draft))
+		}
+
+		roundMembers := make([]cairnfold.Member, 0, len(draft))
+		for _, m := range draft {
 			roundMembers = append(roundMembers, m)
 		}
 		sorted := sortMembersLocal(roundMembers)
@@ -97,10 +134,15 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 		uassert.AbortsWithMessage(t, cur, "ERR_SNAPSHOT_UNVERIFIED: call ConfirmSnapshotVerified before FoldRoster", func() {
 			census.FoldRoster(cross(cur), epID)
 		})
-		// P5(b): UpsertMember MUST abort in FROZEN_SNAPSHOT.
+		rejectedMutations++
+		// P5(b): UpsertMember & RemoveMember MUST abort in FROZEN_SNAPSHOT.
 		uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
 			census.UpsertMember(cross(cur), pool[0], 1, "blocked")
 		})
+		uassert.AbortsWithMessage(t, cur, "ERR_STAGE_FROZEN: roster is frozen awaiting verified fold", func() {
+			census.RemoveMember(cross(cur), pool[0])
+		})
+		rejectedMutations += 2
 
 		tokens := make([]string, len(sorted))
 		for i := range sorted {
@@ -137,13 +179,35 @@ func TestPBT_P5_StageMachineAndCrossEpochIsolation(cur realm, t *testing.T) {
 		}
 	}
 
-	// P5(d): Claim from the OLDEST folded epoch AFTER two newer epochs were sealed & folded!
+	// P5(d) + Claim-driven P4: execute seeded Claim & duplicate-replay sequences against the OLDEST folded epoch.
 	oldest := anchors[0]
-	testing.SetOriginCaller(oldest.members[1].Addr)
-	Claim(cross(cur), oldest.tokens[1])
-	st := GetClaimStats(oldest.id)
-	if st.ClaimedCount != 1 || st.TotalWeightClaimed != oldest.members[1].Weight {
-		t.Fatalf("P5(d) cross-epoch claim stats mismatch: %+v", st)
+	oracleClaimed := make(map[int]bool)
+	var oracleWeight uint64
+	claimApplied := 0
+	claimBlocked := 0
+	for step := 0; step < len(oldest.members)*3; step++ {
+		idx := rng.intn(len(oldest.members))
+		m := oldest.members[idx]
+		tok := oldest.tokens[idx]
+		testing.SetOriginCaller(m.Addr)
+		if oracleClaimed[idx] {
+			uassert.AbortsWithMessage(t, cur, "ERR_ALREADY_CLAIMED: leaf index already claimed for this epoch", func() {
+				Claim(cross(cur), tok)
+			})
+			claimBlocked++
+		} else {
+			Claim(cross(cur), tok)
+			oracleClaimed[idx] = true
+			oracleWeight += m.Weight
+			claimApplied++
+		}
+		st := GetClaimStats(oldest.id)
+		if st.ClaimedCount != len(oracleClaimed) || st.TotalWeightClaimed != oracleWeight || st.BitmapBytes != cairnfold.BitmapSize(oldest.leafCount) {
+			t.Fatalf("P4/P5 claim conservation mismatch at step %d: got=%+v wantCount=%d wantWeight=%d", step, st, len(oracleClaimed), oracleWeight)
+		}
+	}
+	if appliedMutations == 0 || rejectedMutations == 0 || claimApplied == 0 || claimBlocked == 0 {
+		t.Fatalf("expected non-zero applied/rejected transitions: mut=(%d,%d) claim=(%d,%d)", appliedMutations, rejectedMutations, claimApplied, claimBlocked)
 	}
 }
 

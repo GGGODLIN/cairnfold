@@ -1,9 +1,9 @@
 {
   "mode": "DETERMINISTIC_REPLAY",
   "chain_id": "dev",
-  "remote": "http://127.0.0.1:26697",
-  "gnoweb_census_url": "http://127.0.0.1:8898/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1",
-  "gnoweb_gate_url": "http://127.0.0.1:8898/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1",
+  "remote": "http://127.0.0.1:26657",
+  "gnoweb_census_url": "http://127.0.0.1:8888/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/census/v1",
+  "gnoweb_gate_url": "http://127.0.0.1:8888/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1",
   "gnoweb_http_status": {
     "census": 200,
     "gate": 200
@@ -14,31 +14,59 @@
     "gate": "gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1"
   },
   "epoch_1_root_hex": "3a13ec533a21aec0bbf1369113311a759f4a442430f9e1ecb4203a70241264fe",
+  "epoch_1_snapshot_uri": "https://raw.githubusercontent.com/GGGODLIN/cairnfold/main/snapshots/epoch-1.json",
+  "claim_stats_epoch_1_raw": "height: 0\ndata: (struct{(1 uint64),(32 int),(4 int),(2 int),(350 uint64)} gno.land/r/g1st947gecd43mklw0l87x5f9x3a6fxen9m3hnu0/gate/v1.ClaimStats)",
+  "summary_metrics": {
+    "ep1_seeded_state_above_code_bytes": 82492,
+    "ep1_folded_plus_2_claims_above_code_bytes": 4508,
+    "ep1_net_reduction_pct": 94.54,
+    "ep2_unfolded_active_roster_delta_bytes": 16396
+  },
   "storage_checkpoints": {
     "census_empty": {
       "raw": "height: 0\ndata: storage: 21077, deposit: 2107700",
       "bytes": 21077,
       "deposit_ugnot": 2107700
     },
+    "gate_empty": {
+      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
+      "bytes": 10933,
+      "deposit_ugnot": 1093300
+    },
     "census_32_seeded": {
       "raw": "height: 0\ndata: storage: 103569, deposit: 10356900",
       "bytes": 103569,
       "deposit_ugnot": 10356900
+    },
+    "gate_32_seeded": {
+      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
+      "bytes": 10933,
+      "deposit_ugnot": 1093300
     },
     "census_ep1_sealed": {
       "raw": "height: 0\ndata: storage: 105607, deposit: 10560700",
       "bytes": 105607,
       "deposit_ugnot": 10560700
     },
+    "gate_ep1_sealed": {
+      "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
+      "bytes": 10933,
+      "deposit_ugnot": 1093300
+    },
     "census_ep1_folded": {
       "raw": "height: 0\ndata: storage: 23250, deposit: 2325000",
       "bytes": 23250,
       "deposit_ugnot": 2325000
     },
-    "gate_empty": {
+    "gate_ep1_folded": {
       "raw": "height: 0\ndata: storage: 10933, deposit: 1093300",
       "bytes": 10933,
       "deposit_ugnot": 1093300
+    },
+    "census_after_ep2_and_claims": {
+      "raw": "height: 0\ndata: storage: 39646, deposit: 3964600",
+      "bytes": 39646,
+      "deposit_ugnot": 3964600
     },
     "gate_after_2_claims": {
       "raw": "height: 0\ndata: storage: 13268, deposit: 1326800",
@@ -48,17 +76,17 @@
   },
   "transactions": {
     "deploy_pure": {
-      "tx_hash": "3cLxmVFNcMVMpJPBffLAQkUb7PG4WOru2vowH3q6QFI=",
+      "tx_hash": "UD8yFGxW891PYnqMkaMnW/xOe39ABNXlH4XCz8gbJ6Q=",
       "height": 3,
-      "gas_used": 18372958,
-      "storage_delta_bytes": 19501,
-      "storage_fee": "1950100ugnot",
+      "gas_used": 19255551,
+      "storage_delta_bytes": 20385,
+      "storage_fee": "2038500ugnot",
       "storage_refund": null
     },
     "deploy_census": {
-      "tx_hash": "jyKQam0z0GJgHeDlDkXSAyVGNafFUuf8osW67vqPQ2E=",
+      "tx_hash": "WOtwefh6MYvDNHYSGRqxGei9OJUA/EW+s/2dTZwkgtM=",
       "height": 5,
-      "gas_used": 21777726,
+      "gas_used": 22307234,
       "storage_delta_bytes": 21077,
       "storage_fee": "2107700ugnot",
       "storage_refund": null
@@ -66,7 +94,7 @@
     "deploy_gate": {
       "tx_hash": "fqMpKAUhBFV/mIB416qp0KC8RcFOJM0/Dt65LhEHTKQ=",
       "height": 7,
-      "gas_used": 15063451,
+      "gas_used": 15089786,
       "storage_delta_bytes": 10933,
       "storage_fee": "1093300ugnot",
       "storage_refund": null
@@ -74,7 +102,7 @@
     "seed_ep1": {
       "tx_hash": "iOhMq27zy6U9GdlFA3bYIivN4Ws1aNgGe/0HwskDH/c=",
       "height": 9,
-      "gas_used": 60723850,
+      "gas_used": 69775524,
       "storage_delta_bytes": 82492,
       "storage_fee": "8249200ugnot",
       "storage_refund": null
@@ -82,7 +110,7 @@
     "seal_ep1": {
       "tx_hash": "MAKVoYEeZzRxVq4Q4LnAdUrkXSoODQwWZ7geMcg1b8Y=",
       "height": 11,
-      "gas_used": 23135138,
+      "gas_used": 32399859,
       "storage_delta_bytes": 2038,
       "storage_fee": "203800ugnot",
       "storage_refund": null
@@ -90,7 +118,7 @@
     "confirm_ep1": {
       "tx_hash": "Xzt2dZfGuOzVOpuPJ24mdqm08ekxCPT+AdFtSsVkL5k=",
       "height": 13,
-      "gas_used": 19839357,
+      "gas_used": 21037165,
       "storage_delta_bytes": 123,
       "storage_fee": "12300ugnot",
       "storage_refund": null
@@ -98,7 +126,7 @@
     "fold_ep1": {
       "tx_hash": "uiPr4VrXFEirDhUnyZaOU/sGN+SlHwULpK5x9HMCIr4=",
       "height": 15,
-      "gas_used": 25034800,
+      "gas_used": 25040595,
       "storage_delta_bytes": -82480,
       "storage_fee": null,
       "storage_refund": "8248000ugnot"
@@ -106,7 +134,7 @@
     "seed_ep2": {
       "tx_hash": "CZZTutB95BkEV8GTFRH1MFVE1ViZIpjGTOdM7lopTVw=",
       "height": 17,
-      "gas_used": 14199956,
+      "gas_used": 15965862,
       "storage_delta_bytes": 14699,
       "storage_fee": "1469900ugnot",
       "storage_refund": null
@@ -114,7 +142,7 @@
     "seal_ep2": {
       "tx_hash": "cPtZY6XcKztKi2KAPz3l1t9N7vNTgaPL189DGDoqunA=",
       "height": 19,
-      "gas_used": 8891495,
+      "gas_used": 10820398,
       "storage_delta_bytes": 1697,
       "storage_fee": "169700ugnot",
       "storage_refund": null
@@ -122,7 +150,7 @@
     "claim_alice_ep1": {
       "tx_hash": "KSphF7H+l0rynAKyEVuKAEyrF1LVF7cTI5d7x0WZszA=",
       "height": 21,
-      "gas_used": 21319069,
+      "gas_used": 22518462,
       "storage_delta_bytes": 2310,
       "storage_fee": "231000ugnot",
       "storage_refund": null
@@ -130,7 +158,7 @@
     "claim_bob_ep1": {
       "tx_hash": "HYTXCa/EIZlQzZdq3FDuLstjWcLwMPXZwnMSi++7wdc=",
       "height": 23,
-      "gas_used": 21486852,
+      "gas_used": 22678669,
       "storage_delta_bytes": 25,
       "storage_fee": "2500ugnot",
       "storage_refund": null

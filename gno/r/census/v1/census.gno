@@ -98,8 +98,8 @@ func EpochCount() uint64 { return uint64(len(epochs)) }
 func UpsertMember(cur realm, addr address, weight uint64, role string) {
 	assertOwner(cur)
 	assertOpen()
-	if !addr.IsValid() {
-		panic("ERR_INVALID_MEMBER: invalid gno address")
+	if !cairnfold.IsCanonicalAddress(addr) {
+		panic("ERR_INVALID_MEMBER: invalid canonical lowercase gno address")
 	}
 	if weight == 0 {
 		panic("ERR_INVALID_MEMBER: weight must be >= 1")
@@ -118,8 +118,8 @@ func UpsertMember(cur realm, addr address, weight uint64, role string) {
 func RemoveMember(cur realm, addr address) bool {
 	assertOwner(cur)
 	assertOpen()
-	if !addr.IsValid() {
-		panic("ERR_INVALID_MEMBER: invalid gno address")
+	if !cairnfold.IsCanonicalAddress(addr) {
+		panic("ERR_INVALID_MEMBER: invalid canonical lowercase gno address")
 	}
 	_, removed := activeRoster.Remove(string(addr))
 	return removed
@@ -146,7 +146,7 @@ func SeedRosterBatch(cur realm, csvLines string) int {
 			panic("ERR_INVALID_BATCH: invalid weight")
 		}
 		role := strings.TrimSpace(parts[2])
-		if !addr.IsValid() || !cairnfold.IsValidRole(role) {
+		if !cairnfold.IsCanonicalAddress(addr) || !cairnfold.IsValidRole(role) {
 			panic("ERR_INVALID_BATCH: invalid address or role")
 		}
 		parsed = append(parsed, cairnfold.Member{Addr: addr, Weight: w, Role: role})
@@ -171,13 +171,22 @@ func SealEpoch(cur realm, purpose string) uint64 {
 	if activeRoster.Size() == 0 {
 		panic("ERR_EMPTY_ROSTER: cannot seal an empty roster")
 	}
+	if activeRoster.Size() > cairnfold.MaxLeafCount {
+		panic("ERR_ROSTER_TOO_LARGE: roster exceeds MaxLeafCount")
+	}
 	if !cairnfold.IsValidPurpose(purpose) {
 		panic("ERR_INVALID_PURPOSE: purpose must be 1..64 printable ASCII chars without '|' or ':'")
 	}
 	nextID := uint64(len(epochs)) + 1
 	members := make([]cairnfold.Member, 0, activeRoster.Size())
+	var sumWeight uint64
 	activeRoster.Iterate("", "", func(_ string, v interface{}) bool {
-		members = append(members, v.(cairnfold.Member))
+		m := v.(cairnfold.Member)
+		if sumWeight > ^uint64(0)-m.Weight {
+			panic("ERR_WEIGHT_OVERFLOW: sum of epoch weights exceeds uint64")
+		}
+		sumWeight += m.Weight
+		members = append(members, m)
 		return false
 	})
 	root, err := cairnfold.ComputeRoot(nextID, members)
@@ -209,7 +218,7 @@ func SealEpoch(cur realm, purpose string) uint64 {
 
 // ExportCanonicalSnapshot outputs canonical CSV rows while FROZEN_SNAPSHOT, or SnapshotURI guidance afterward.
 func ExportCanonicalSnapshot(epochID uint64) string {
-	if epochID == 0 || int(epochID) > len(epochs) {
+	if epochID == 0 || epochID > uint64(len(epochs)) {
 		return "ERR_EPOCH_NOT_FOUND"
 	}
 	ep := epochs[epochID-1]
@@ -301,7 +310,7 @@ func FoldRoster(cur realm, epochID uint64) int {
 
 // GetEpoch returns a defensive read-only EpochView for downstream consumer realms.
 func GetEpoch(epochID uint64) (cairnfold.EpochView, bool) {
-	if epochID == 0 || int(epochID) > len(epochs) {
+	if epochID == 0 || epochID > uint64(len(epochs)) {
 		return cairnfold.EpochView{}, false
 	}
 	return epochToView(epochs[epochID-1]), true

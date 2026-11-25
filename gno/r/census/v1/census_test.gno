@@ -163,3 +163,30 @@ func TestCensusLifecycleAndOwnerGuards(cur realm, t *testing.T) {
 		t.Fatalf("Render missing expected sections: %q", md)
 	}
 }
+
+func TestCensusRegressionGuards(cur realm, t *testing.T) {
+	testing.SetOriginCaller(testOp)
+
+	// Regression: uint64 epochID > MaxInt64 must return not-found without negative slice index panic.
+	if _, ok := GetEpoch(^uint64(0)); ok {
+		t.Fatal("GetEpoch(MaxUint64) must return false")
+	}
+	if got := ExportCanonicalSnapshot(^uint64(0)); got != "ERR_EPOCH_NOT_FOUND" {
+		t.Fatalf("ExportCanonicalSnapshot(MaxUint64) = %q, want ERR_EPOCH_NOT_FOUND", got)
+	}
+
+	// Regression: non-canonical uppercase Gno address rejected.
+	upperAlice := address(strings.ToUpper(string(testAlice)))
+	uassert.AbortsWithMessage(t, cur, "ERR_INVALID_MEMBER: invalid canonical lowercase gno address", func() {
+		UpsertMember(cross(cur), upperAlice, 10, "builder")
+	})
+
+	// Regression: SealEpoch rejects roster whose weights would overflow uint64.
+	UpsertMember(cross(cur), testAlice, ^uint64(0)-5, "builder")
+	UpsertMember(cross(cur), testBob, 10, "reviewer")
+	uassert.AbortsWithMessage(t, cur, "ERR_WEIGHT_OVERFLOW: sum of epoch weights exceeds uint64", func() {
+		SealEpoch(cross(cur), "Overflow Cohort")
+	})
+	RemoveMember(cross(cur), testAlice)
+	RemoveMember(cross(cur), testBob)
+}

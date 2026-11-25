@@ -19,6 +19,9 @@ import (
 
 const bech32Charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
+// MaxLeafCount matches cairnfold.MaxLeafCount in gno/p/cairnfold/v1.
+const MaxLeafCount = 1_000_000
+
 type Member struct {
 	Addr   string `json:"addr"`
 	Weight uint64 `json:"weight"`
@@ -183,6 +186,9 @@ func validateSnapshot(snap *Snapshot) error {
 	if len(snap.Members) == 0 {
 		return errors.New("snapshot contains no members")
 	}
+	if len(snap.Members) > MaxLeafCount {
+		return fmt.Errorf("snapshot exceeds MaxLeafCount (%d)", MaxLeafCount)
+	}
 	if snap.LeafCount != 0 && snap.LeafCount != len(snap.Members) {
 		return fmt.Errorf("leaf_count mismatch: header=%d actual=%d", snap.LeafCount, len(snap.Members))
 	}
@@ -251,6 +257,14 @@ func parseCanonicalCSV(text string) (*Snapshot, error) {
 		}
 		if strings.HasPrefix(ln, "#") {
 			meta := strings.TrimSpace(strings.TrimPrefix(ln, "#"))
+			// Peel trailing ",purpose=..." first so commas inside purpose cannot spoof metadata keys.
+			if before, after, ok := strings.Cut(meta, ",purpose="); ok {
+				snap.Purpose = strings.TrimSpace(after)
+				meta = before
+			} else if strings.HasPrefix(meta, "purpose=") {
+				snap.Purpose = strings.TrimSpace(strings.TrimPrefix(meta, "purpose="))
+				meta = ""
+			}
 			for _, kv := range strings.Split(meta, ",") {
 				parts := strings.SplitN(strings.TrimSpace(kv), "=", 2)
 				if len(parts) != 2 {

@@ -278,4 +278,19 @@ func TestParseCanonicalCSVSnapshot(t *testing.T) {
 	if snapUpper.RootHex != bundle.RootHex {
 		t.Fatalf("expected normalized lowercase root_hex %q, got %q", bundle.RootHex, snapUpper.RootHex)
 	}
+
+	// Regression: commas inside purpose must not spoof earlier metadata keys (e.g. schema_id=2).
+	commaPurposeCSV := strings.Replace(
+		csvData,
+		"root_hex=",
+		"root_hex="+bundle.RootHex+",purpose=Cohort 1,schema_id=2,leaf_count=99",
+		1,
+	)
+	snapComma, err := ParseCanonicalSnapshot([]byte(commaPurposeCSV))
+	if err != nil {
+		t.Fatalf("CSV with comma inside purpose failed: %v", err)
+	}
+	if snapComma.SchemaID != 1 || snapComma.LeafCount != 2 || snapComma.Purpose != "Cohort 1,schema_id=2,leaf_count=99" {
+		t.Fatalf("purpose comma spoofed metadata: %+v", snapComma)
+	}
 }

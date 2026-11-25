@@ -12,6 +12,9 @@ import (
 // SchemaV1 identifies canonical leaf schema version 1.
 const SchemaV1 uint32 = 1
 
+// MaxLeafCount bounds supported epoch roster sizes across encoder, decoder, and CLI.
+const MaxLeafCount = 1_000_000
+
 // Verification result codes returned by DecodeProofToken and VerifyToken.
 const (
 	CodeOK                  = "OK"
@@ -93,14 +96,32 @@ func IsValidPurpose(purpose string) bool {
 	return true
 }
 
+// IsCanonicalAddress checks that addr is a valid lowercase Gno bech32 address ("g1...").
+func IsCanonicalAddress(addr address) bool {
+	if !addr.IsValid() {
+		return false
+	}
+	s := string(addr)
+	if !strings.HasPrefix(s, "g1") {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
+}
+
 // EncodeLeaf returns canonical SchemaV1 leaf bytes:
 // cairnfold:v1|<epochID>|<addr>|<weight>|<role>
 func EncodeLeaf(epochID uint64, addr address, weight uint64, role string) ([]byte, error) {
 	if epochID == 0 {
 		return nil, errors.New("epochID must be >= 1")
 	}
-	if !addr.IsValid() {
-		return nil, errors.New("invalid gno address")
+	if !IsCanonicalAddress(addr) {
+		return nil, errors.New("invalid canonical lowercase gno address")
 	}
 	if weight == 0 {
 		return nil, errors.New("weight must be >= 1")
@@ -162,9 +183,7 @@ func maxProofDepth(total int) int {
 		return 0
 	}
 	depth := 0
-	pow := 1
-	for pow < total {
-		pow *= 2
+	for v := total - 1; v > 0; v >>= 1 {
 		depth++
 	}
 	return depth
@@ -207,11 +226,11 @@ func EncodeProofToken(p ProofToken) (string, error) {
 	if p.EpochID == 0 {
 		return "", errors.New("epochID must be >= 1")
 	}
-	if p.Total <= 0 || p.Index < 0 || p.Index >= p.Total {
-		return "", errors.New("index out of range for total")
+	if p.Total <= 0 || p.Total > MaxLeafCount || p.Index < 0 || p.Index >= p.Total {
+		return "", errors.New("index or total out of allowed range")
 	}
-	if !p.Addr.IsValid() {
-		return "", errors.New("invalid address")
+	if !IsCanonicalAddress(p.Addr) {
+		return "", errors.New("invalid canonical lowercase address")
 	}
 	if p.Weight == 0 {
 		return "", errors.New("weight must be >= 1")
@@ -265,7 +284,7 @@ func parseCanonicalUint64(raw string) (uint64, bool) {
 
 func parseCanonicalNonNegInt(raw string) (int, bool) {
 	v, ok := parseCanonicalUint64(raw)
-	if !ok || v > 1_000_000 {
+	if !ok || v > MaxLeafCount {
 		return 0, false
 	}
 	return int(v), true
@@ -290,8 +309,8 @@ func DecodeProofToken(raw string) (ProofToken, VerifyResult) {
 		return ProofToken{}, VerifyResult{Code: CodeErrDecode, Message: "invalid total or index out of bounds"}
 	}
 	addr := address(parts[4])
-	if !addr.IsValid() {
-		return ProofToken{}, VerifyResult{Code: CodeErrDecode, Message: "invalid gno address"}
+	if !IsCanonicalAddress(addr) {
+		return ProofToken{}, VerifyResult{Code: CodeErrDecode, Message: "invalid canonical lowercase gno address"}
 	}
 	weight, ok := parseCanonicalUint64(parts[5])
 	if !ok || weight == 0 {
@@ -333,7 +352,7 @@ func VerifyToken(raw string, caller address, epoch *EpochView, bitmap []byte) (P
 	if epoch == nil || epoch.ID != tok.EpochID || len(epoch.Root) != 32 {
 		return tok, VerifyResult{Code: CodeErrEpochNotFound, Message: "epoch anchor not found"}
 	}
-	if !caller.IsValid() || caller != tok.Addr {
+	if !IsCanonicalAddress(caller) || caller != tok.Addr {
 		return tok, VerifyResult{Code: CodeErrCallerMismatch, Message: "caller does not match proof address"}
 	}
 	if tok.Total != epoch.LeafCount || tok.Index < 0 || tok.Index >= tok.Total {

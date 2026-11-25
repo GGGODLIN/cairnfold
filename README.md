@@ -29,7 +29,8 @@ On Gno.land, persistent realm state locks **`100 ugnot` per byte** as a storage 
 | 2. 32-member AVL seeded (`SeedRosterBatch`) | `103,569 B` | `10,933 B` | **`+82,492 B`** | **`+8,249,200 ugnot` (`8.25 GNOT`)** |
 | 3. Epoch 1 sealed (`SealEpoch`) | `105,607 B` | `10,933 B` | `+84,530 B` | `+8,453,000 ugnot` |
 | 4. Canary verified + **`FoldRoster(1)`** | **`23,250 B`** | `10,933 B` | **`+2,173 B`** | **`-8,248,000 ugnot` REFUNDED (`99.99%` of roster)** |
-| 5. Post-fold Epoch 1 claims (`Alice` + `Bob` after Epoch 2 removed Alice) | `23,250 B` | **`13,268 B`** | **`+4,508 B`** | **`94.5%` net storage reduction across BOTH realms** |
+| 5. Post-fold Epoch 1 claims (`Alice` + `Bob`, isolated Epoch 1 footprint) | `23,250 B` | **`13,268 B`** | **`+4,508 B`** | **`94.54%` net Epoch 1 storage reduction across BOTH realms** |
+| 6. After Epoch 2 seeded & sealed (unfolded 6-member active roster + 2 Epoch 1 claims) | `39,646 B` | `13,268 B` | `+20,904 B` | `+16,396 B` active Epoch 2 AVL roster (reclaimable via `FoldRoster(2)`) |
 
 - 1st claim (`Alice`, index `0`) allocates the Epoch 1 bitmap struct (`+2,310 B`); 2nd claim (`Bob`, index `19`) adds only **`+25 B` (`2,500 ugnot`)**.
 - Negative checks (`CheckProof` read-only `vm/qeval`):

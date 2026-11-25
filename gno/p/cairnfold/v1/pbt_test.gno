@@ -217,6 +217,52 @@ func checkP3CompletenessAndSoundness(epochID uint64, members []Member) bool {
 			return false
 		}
 
+		// Flip role -> must fail.
+		pBadRole := p
+		pBadRole.Role = m.Role + "_x"
+		rawBadRole, _ := EncodeProofToken(pBadRole)
+		if _, res := VerifyToken(rawBadRole, m.Addr, epoch, bm); res.OK() {
+			return false
+		}
+
+		// Flip epochID -> must fail.
+		pBadEpoch := p
+		pBadEpoch.EpochID = epochID + 1
+		rawBadEpoch, _ := EncodeProofToken(pBadEpoch)
+		if _, res := VerifyToken(rawBadEpoch, m.Addr, epoch, bm); res.OK() {
+			return false
+		}
+
+		// Flip total -> must fail.
+		pBadTotal := p
+		pBadTotal.Total = len(sorted) + 1
+		if len(pBadTotal.Aunts) == 0 {
+			pBadTotal.Aunts = make([]byte, 32)
+			pBadTotal.AuntsHex = hex.EncodeToString(pBadTotal.Aunts)
+		}
+		rawBadTotal, _ := EncodeProofToken(pBadTotal)
+		if _, res := VerifyToken(rawBadTotal, m.Addr, epoch, bm); res.OK() {
+			return false
+		}
+
+		// Flip index and swap addr (when total > 1) -> must fail.
+		if len(sorted) > 1 {
+			pBadIndex := p
+			pBadIndex.Index = (i + 1) % len(sorted)
+			rawBadIndex, _ := EncodeProofToken(pBadIndex)
+			if _, res := VerifyToken(rawBadIndex, m.Addr, epoch, bm); res.OK() {
+				return false
+			}
+
+			otherAddr := sorted[(i+1)%len(sorted)].Addr
+			pBadAddr := p
+			pBadAddr.Addr = otherAddr
+			rawBadAddr, _ := EncodeProofToken(pBadAddr)
+			if _, res := VerifyToken(rawBadAddr, otherAddr, epoch, bm); res.OK() {
+				return false
+			}
+		}
+
 		// Flip 1 bit in aunts (when total > 1) -> must fail.
 		if len(aunts) > 0 {
 			badAunts := make([]byte, len(aunts))

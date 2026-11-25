@@ -51,9 +51,12 @@ PKG_CENSUS="gno.land/r/${OP_ADDR}/census/v1"
 PKG_GATE="gno.land/r/${OP_ADDR}/gate/v1"
 
 run_gnokey() {
-  local out
-  out="$(printf '%s\n' "$KEYPASS" | "$GNOKEY" "$@" -home "$KEYHOME" -insecure-password-stdin)"
+  local out rc=0
+  out="$(printf '%s\n' "$KEYPASS" | "$GNOKEY" "$@" -home "$KEYHOME" -insecure-password-stdin)" || rc=$?
   printf '%s\n' "$out"
+  if (( rc != 0 )); then
+    return "$rc"
+  fi
   sleep 1.2
 }
 
@@ -163,12 +166,14 @@ echo "$TX_SEED_EP1"
 
 # Checkpoint 2: Roster seeded (pre-seal, full AVL live)
 Q_CENSUS_SEEDED="$(query_storage "$PKG_CENSUS")"
+Q_GATE_SEEDED="$(query_storage "$PKG_GATE")"
 
 # 3. Seal Epoch 1
 echo "Sealing Epoch 1..."
 TX_SEAL_EP1="$(run_gnokey maketx call -pkgpath "$PKG_CENSUS" -func "SealEpoch" -args "Cohort 1 Snapshot (32 synthetic members)" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 20000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
 echo "$TX_SEAL_EP1"
 Q_CENSUS_SEALED="$(query_storage "$PKG_CENSUS")"
+Q_GATE_SEALED="$(query_storage "$PKG_GATE")"
 
 # 4. Export canonical snapshot from chain and rebuild proofs offline via cmd/cairnproof
 echo "Exporting canonical snapshot from chain..."
@@ -183,8 +188,25 @@ raw = m.group(1).encode("utf-8").decode("unicode_escape")
 open(sys.argv[1], "w", encoding="utf-8").write(raw)
 PY
 
+ONCHAIN_ROOT="$(python3 - "$TMP_DIR/epoch-1-exported.csv" <<'PY'
+import re, sys
+first = open(sys.argv[1], encoding="utf-8").readline()
+m = re.search(r'root_hex=([0-9a-fA-F]{64})', first)
+if not m:
+    raise SystemExit("failed to parse root_hex from ExportCanonicalSnapshot header: " + first)
+print(m.group(1).lower())
+PY
+)"
+
 cd "$REPO_ROOT"
-go run ./cmd/cairnproof build-proofs --input "$TMP_DIR/epoch-1-exported.csv" --out "$TMP_DIR/epoch-1-proofs.json"
+EP1_SNAP_URI="${SNAPSHOT_BASE_URL}/epoch-1.json"
+if [[ "$NETWORK" == "onyx" ]]; then
+  echo "Fetching published snapshot from $EP1_SNAP_URI to prove off-chain availability before FoldRoster..."
+  curl -fsSL "$EP1_SNAP_URI" -o "$TMP_DIR/epoch-1-published.json"
+  go run ./cmd/cairnproof build-proofs --input "$TMP_DIR/epoch-1-published.json" --expected-root "$ONCHAIN_ROOT" --out "$TMP_DIR/epoch-1-proofs.json"
+else
+  go run ./cmd/cairnproof build-proofs --input "$TMP_DIR/epoch-1-exported.csv" --expected-root "$ONCHAIN_ROOT" --out "$TMP_DIR/epoch-1-proofs.json"
+fi
 
 ALICE_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print([p["token"] for p in d["proofs"] if p["addr"]==sys.argv[2]][0])' "$TMP_DIR/epoch-1-proofs.json" "$ALICE_ADDR")"
 BOB_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print([p["token"] for p in d["proofs"] if p["addr"]==sys.argv[2]][0])' "$TMP_DIR/epoch-1-proofs.json" "$BOB_ADDR")"
@@ -192,7 +214,7 @@ EP1_ROOT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["roo
 
 # 5. Confirm snapshot canary on-chain
 echo "Confirming snapshot canary on-chain..."
-TX_CONFIRM_EP1="$(run_gnokey maketx call -pkgpath "$PKG_CENSUS" -func "ConfirmSnapshotVerified" -args "1" -args "${SNAPSHOT_BASE_URL}/epoch-1.json" -args "$ALICE_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -max-deposit 10000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
+TX_CONFIRM_EP1="$(run_gnokey maketx call -pkgpath "$PKG_CENSUS" -func "ConfirmSnapshotVerified" -args "1" -args "$EP1_SNAP_URI" -args "$ALICE_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -max-deposit 10000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
 echo "$TX_CONFIRM_EP1"
 
 # 6. FoldRoster: delete AVL entries and reclaim storage deposit!
@@ -200,8 +222,9 @@ echo "Folding Epoch 1 roster to reclaim storage deposit..."
 TX_FOLD_EP1="$(run_gnokey maketx call -pkgpath "$PKG_CENSUS" -func "FoldRoster" -args "1" -gas-fee 120000ugnot -gas-wanted 120000000 -max-deposit 10000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$OPERATOR_KEY")"
 echo "$TX_FOLD_EP1"
 
-# Checkpoint 3: Post-fold storage
+# Checkpoint 3: Post-fold storage (both realms)
 Q_CENSUS_FOLDED="$(query_storage "$PKG_CENSUS")"
+Q_GATE_FOLDED="$(query_storage "$PKG_GATE")"
 
 # 7. Seed & seal Epoch 2 (removing Alice, changing Bob weight) to prove Epoch 1 immutability!
 CSV_BATCH_2="$(python3 - "$REPO_ROOT/snapshots/epoch-2.json" <<'PY'
@@ -223,8 +246,13 @@ echo "Claiming Epoch 1 as Bob..."
 TX_CLAIM_BOB="$(run_gnokey maketx call -pkgpath "$PKG_GATE" -func "Claim" -args "$BOB_TOKEN" -gas-fee 60000ugnot -gas-wanted 60000000 -max-deposit 5000000ugnot -chainid "$CHAIN_ID" -remote "$REMOTE" "$BOB_KEY")"
 echo "$TX_CLAIM_BOB"
 
-# Checkpoint 4: Post-claims gate storage
+# Checkpoint 4: Final post-claims storage (both realms, including live Epoch 2 active roster in census)
+Q_CENSUS_FINAL="$(query_storage "$PKG_CENSUS")"
 Q_GATE_AFTER_CLAIMS="$(query_storage "$PKG_GATE")"
+
+# Query on-chain GetClaimStats(1) to confirm both claims persisted in gate/v1
+Q_CLAIM_STATS_EP1="$("$GNOKEY" query vm/qeval -data "${PKG_GATE}.GetClaimStats(1)" -remote "$REMOTE")"
+echo "GetClaimStats(1): $Q_CLAIM_STATS_EP1"
 
 # 9. Verify negative rejections via read-only CheckProof (zero gas, exact stage codes)
 UNCLAIMED_TOKEN="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["proofs"][1]["token"])' "$TMP_DIR/epoch-1-proofs.json")"
@@ -244,84 +272,141 @@ echo "$NEG_DOUBLE" | grep -q "ERR_ALREADY_CLAIMED"
 echo "$NEG_CALLER" | grep -q "ERR_CALLER_MISMATCH"
 echo "$NEG_TAMPER" | grep -q "ERR_MERKLE_PROOF_MISMATCH"
 
-# 10. Check gnoweb HTTP 200
-CENSUS_HTTP="$(curl -s -o /dev/null -w '%{http_code}' "${GNOWEB_BASE}/r/${OP_ADDR}/census/v1")"
-GATE_HTTP="$(curl -s -o /dev/null -w '%{http_code}' "${GNOWEB_BASE}/r/${OP_ADDR}/gate/v1")"
+# 10. Check gnoweb HTTP 200 AND rendered HTML content markers
+CENSUS_HTTP="$(curl -s -o "$TMP_DIR/census.html" -w '%{http_code}' "${GNOWEB_BASE}/r/${OP_ADDR}/census/v1")"
+GATE_HTTP="$(curl -s -o "$TMP_DIR/gate.html" -w '%{http_code}' "${GNOWEB_BASE}/r/${OP_ADDR}/gate/v1")"
 echo "gnoweb HTTP codes: census=$CENSUS_HTTP gate=$GATE_HTTP"
 [[ "$CENSUS_HTTP" == "200" && "$GATE_HTTP" == "200" ]]
+grep -q "Cohort 1 Snapshot" "$TMP_DIR/census.html"
+grep -q "CairnFold" "$TMP_DIR/gate.html"
+grep -q "Claim" "$TMP_DIR/gate.html"
 
-# 11. Atomically write receipts JSON
+# 11. Assert all storage/claim invariants and atomically write receipts JSON (env-passed, no code injection)
 mkdir -p "$(dirname "$RECEIPT_OUT")"
-python3 - "$TMP_DIR/receipt.json" "$RECEIPT_OUT" <<PY
+export MODE_LABEL CHAIN_ID REMOTE GNOWEB_BASE OP_ADDR CENSUS_HTTP GATE_HTTP
+export PKG_PURE PKG_CENSUS PKG_GATE EP1_ROOT EP1_SNAP_URI
+export Q_CENSUS_EMPTY Q_GATE_EMPTY Q_CENSUS_SEEDED Q_GATE_SEEDED Q_CENSUS_SEALED Q_GATE_SEALED
+export Q_CENSUS_FOLDED Q_GATE_FOLDED Q_CENSUS_FINAL Q_GATE_AFTER_CLAIMS Q_CLAIM_STATS_EP1
+export TX_DEPLOY_PURE TX_DEPLOY_CENSUS TX_DEPLOY_GATE TX_SEED_EP1 TX_SEAL_EP1 TX_CONFIRM_EP1
+export TX_FOLD_EP1 TX_SEED_EP2 TX_SEAL_EP2 TX_CLAIM_ALICE TX_CLAIM_BOB
+export NEG_DOUBLE NEG_CALLER NEG_TAMPER
+
+python3 - "$TMP_DIR/receipt.json" "$RECEIPT_OUT" <<'PY'
 import json, os, re, sys
 
-def parse_storage(txt):
-    size_m = re.search(r"storage:\s*(\d+)", txt)
-    dep_m = re.search(r"deposit:\s*(\d+)", txt)
-    if not size_m:
-        size_m = re.search(r"storage_size:\s*(\d+)", txt)
-    if not dep_m:
-        dep_m = re.search(r"storage_deposit:\s*(\d+)", txt)
+def parse_storage(txt, label):
+    size_m = re.search(r"storage:\s*(\d+)", txt) or re.search(r"storage_size:\s*(\d+)", txt)
+    dep_m = re.search(r"deposit:\s*(\d+)", txt) or re.search(r"storage_deposit:\s*(\d+)", txt)
+    if not size_m or not dep_m:
+        raise SystemExit(f"failed to parse storage checkpoint {label}: {txt!r}")
     return {
         "raw": txt.strip(),
-        "bytes": int(size_m.group(1)) if size_m else None,
-        "deposit_ugnot": int(dep_m.group(1)) if dep_m else None,
+        "bytes": int(size_m.group(1)),
+        "deposit_ugnot": int(dep_m.group(1)),
     }
 
-def parse_tx(txt):
+def parse_tx(txt, label):
     h = re.search(r"TX HASH:\s*(\S+)", txt)
     ht = re.search(r"HEIGHT:\s*(\d+)", txt)
     sd = re.search(r"STORAGE DELTA:\s*([-+]?\d+)", txt)
     sf = re.search(r"STORAGE FEE:\s*([-+]?\d+ugnot)", txt)
     sr = re.search(r"STORAGE REFUND:\s*([-+]?\d+ugnot)", txt)
     gu = re.search(r"GAS USED:\s*(\d+)", txt)
+    if not h or not ht:
+        raise SystemExit(f"missing tx hash/height for {label}: {txt!r}")
     return {
-        "tx_hash": h.group(1) if h else None,
-        "height": int(ht.group(1)) if ht else None,
+        "tx_hash": h.group(1),
+        "height": int(ht.group(1)),
         "gas_used": int(gu.group(1)) if gu else None,
         "storage_delta_bytes": int(sd.group(1)) if sd else None,
         "storage_fee": sf.group(1) if sf else None,
         "storage_refund": sr.group(1) if sr else None,
     }
 
+checkpoints = {
+    "census_empty": parse_storage(os.environ["Q_CENSUS_EMPTY"], "census_empty"),
+    "gate_empty": parse_storage(os.environ["Q_GATE_EMPTY"], "gate_empty"),
+    "census_32_seeded": parse_storage(os.environ["Q_CENSUS_SEEDED"], "census_32_seeded"),
+    "gate_32_seeded": parse_storage(os.environ["Q_GATE_SEEDED"], "gate_32_seeded"),
+    "census_ep1_sealed": parse_storage(os.environ["Q_CENSUS_SEALED"], "census_ep1_sealed"),
+    "gate_ep1_sealed": parse_storage(os.environ["Q_GATE_SEALED"], "gate_ep1_sealed"),
+    "census_ep1_folded": parse_storage(os.environ["Q_CENSUS_FOLDED"], "census_ep1_folded"),
+    "gate_ep1_folded": parse_storage(os.environ["Q_GATE_FOLDED"], "gate_ep1_folded"),
+    "census_after_ep2_and_claims": parse_storage(os.environ["Q_CENSUS_FINAL"], "census_after_ep2_and_claims"),
+    "gate_after_2_claims": parse_storage(os.environ["Q_GATE_AFTER_CLAIMS"], "gate_after_2_claims"),
+}
+
+txs = {
+    "deploy_pure": parse_tx(os.environ["TX_DEPLOY_PURE"], "deploy_pure"),
+    "deploy_census": parse_tx(os.environ["TX_DEPLOY_CENSUS"], "deploy_census"),
+    "deploy_gate": parse_tx(os.environ["TX_DEPLOY_GATE"], "deploy_gate"),
+    "seed_ep1": parse_tx(os.environ["TX_SEED_EP1"], "seed_ep1"),
+    "seal_ep1": parse_tx(os.environ["TX_SEAL_EP1"], "seal_ep1"),
+    "confirm_ep1": parse_tx(os.environ["TX_CONFIRM_EP1"], "confirm_ep1"),
+    "fold_ep1": parse_tx(os.environ["TX_FOLD_EP1"], "fold_ep1"),
+    "seed_ep2": parse_tx(os.environ["TX_SEED_EP2"], "seed_ep2"),
+    "seal_ep2": parse_tx(os.environ["TX_SEAL_EP2"], "seal_ep2"),
+    "claim_alice_ep1": parse_tx(os.environ["TX_CLAIM_ALICE"], "claim_alice_ep1"),
+    "claim_bob_ep1": parse_tx(os.environ["TX_CLAIM_BOB"], "claim_bob_ep1"),
+}
+
+# Hard invariants: FoldRoster must refund real bytes, combined Epoch 1 footprint must shrink, and 2 claims must persist.
+fold_delta = txs["fold_ep1"]["storage_delta_bytes"]
+if fold_delta is None or fold_delta >= 0:
+    raise SystemExit(f"FoldRoster did not reclaim storage bytes: {fold_delta}")
+
+ep1_seeded_above_code = (
+    (checkpoints["census_32_seeded"]["bytes"] - checkpoints["census_empty"]["bytes"])
+    + (checkpoints["gate_32_seeded"]["bytes"] - checkpoints["gate_empty"]["bytes"])
+)
+ep1_folded_plus_claims_above_code = (
+    (checkpoints["census_ep1_folded"]["bytes"] - checkpoints["census_empty"]["bytes"])
+    + (checkpoints["gate_after_2_claims"]["bytes"] - checkpoints["gate_empty"]["bytes"])
+)
+if ep1_folded_plus_claims_above_code >= ep1_seeded_above_code:
+    raise SystemExit(
+        f"Expected combined Epoch 1 storage after fold+claims ({ep1_folded_plus_claims_above_code} B) "
+        f"< seeded roster ({ep1_seeded_above_code} B)"
+    )
+
+stats_raw = os.environ["Q_CLAIM_STATS_EP1"].strip()
+if "(2 int)" not in stats_raw and "ClaimedCount: 2" not in stats_raw:
+    raise SystemExit(f"GetClaimStats(1) did not report 2 claims: {stats_raw}")
+
+op_addr = os.environ["OP_ADDR"]
+gnoweb_base = os.environ["GNOWEB_BASE"]
 receipt = {
-    "mode": "${MODE_LABEL}",
-    "chain_id": "${CHAIN_ID}",
-    "remote": "${REMOTE}",
-    "gnoweb_census_url": "${GNOWEB_BASE}/r/${OP_ADDR}/census/v1",
-    "gnoweb_gate_url": "${GNOWEB_BASE}/r/${OP_ADDR}/gate/v1",
-    "gnoweb_http_status": {"census": int("${CENSUS_HTTP}"), "gate": int("${GATE_HTTP}")},
+    "mode": os.environ["MODE_LABEL"],
+    "chain_id": os.environ["CHAIN_ID"],
+    "remote": os.environ["REMOTE"],
+    "gnoweb_census_url": f"{gnoweb_base}/r/{op_addr}/census/v1",
+    "gnoweb_gate_url": f"{gnoweb_base}/r/{op_addr}/gate/v1",
+    "gnoweb_http_status": {
+        "census": int(os.environ["CENSUS_HTTP"]),
+        "gate": int(os.environ["GATE_HTTP"]),
+    },
     "packages": {
-        "cairnfold": "${PKG_PURE}",
-        "census": "${PKG_CENSUS}",
-        "gate": "${PKG_GATE}",
+        "cairnfold": os.environ["PKG_PURE"],
+        "census": os.environ["PKG_CENSUS"],
+        "gate": os.environ["PKG_GATE"],
     },
-    "epoch_1_root_hex": "${EP1_ROOT}",
-    "storage_checkpoints": {
-        "census_empty": parse_storage("""${Q_CENSUS_EMPTY}"""),
-        "census_32_seeded": parse_storage("""${Q_CENSUS_SEEDED}"""),
-        "census_ep1_sealed": parse_storage("""${Q_CENSUS_SEALED}"""),
-        "census_ep1_folded": parse_storage("""${Q_CENSUS_FOLDED}"""),
-        "gate_empty": parse_storage("""${Q_GATE_EMPTY}"""),
-        "gate_after_2_claims": parse_storage("""${Q_GATE_AFTER_CLAIMS}"""),
+    "epoch_1_root_hex": os.environ["EP1_ROOT"],
+    "epoch_1_snapshot_uri": os.environ["EP1_SNAP_URI"],
+    "claim_stats_epoch_1_raw": stats_raw,
+    "summary_metrics": {
+        "ep1_seeded_state_above_code_bytes": ep1_seeded_above_code,
+        "ep1_folded_plus_2_claims_above_code_bytes": ep1_folded_plus_claims_above_code,
+        "ep1_net_reduction_pct": round((1.0 - ep1_folded_plus_claims_above_code / ep1_seeded_above_code) * 100.0, 2),
+        "ep2_unfolded_active_roster_delta_bytes": (
+            checkpoints["census_after_ep2_and_claims"]["bytes"] - checkpoints["census_ep1_folded"]["bytes"]
+        ),
     },
-    "transactions": {
-        "deploy_pure": parse_tx("""${TX_DEPLOY_PURE}"""),
-        "deploy_census": parse_tx("""${TX_DEPLOY_CENSUS}"""),
-        "deploy_gate": parse_tx("""${TX_DEPLOY_GATE}"""),
-        "seed_ep1": parse_tx("""${TX_SEED_EP1}"""),
-        "seal_ep1": parse_tx("""${TX_SEAL_EP1}"""),
-        "confirm_ep1": parse_tx("""${TX_CONFIRM_EP1}"""),
-        "fold_ep1": parse_tx("""${TX_FOLD_EP1}"""),
-        "seed_ep2": parse_tx("""${TX_SEED_EP2}"""),
-        "seal_ep2": parse_tx("""${TX_SEAL_EP2}"""),
-        "claim_alice_ep1": parse_tx("""${TX_CLAIM_ALICE}"""),
-        "claim_bob_ep1": parse_tx("""${TX_CLAIM_BOB}"""),
-    },
+    "storage_checkpoints": checkpoints,
+    "transactions": txs,
     "negative_checks": {
-        "double_claim": """${NEG_DOUBLE}""".strip(),
-        "wrong_caller": """${NEG_CALLER}""".strip(),
-        "tampered_leaf": """${NEG_TAMPER}""".strip(),
+        "double_claim": os.environ["NEG_DOUBLE"].strip(),
+        "wrong_caller": os.environ["NEG_CALLER"].strip(),
+        "tampered_leaf": os.environ["NEG_TAMPER"].strip(),
     },
 }
 
