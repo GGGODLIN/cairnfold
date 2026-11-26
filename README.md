@@ -3,6 +3,7 @@
 **Epoch-Sealed Tendermint Merkle Snapshots & Storage-Deposit Reclamation for Gno.land**
 
 > Built for **Gnome Tavern Hackathon | Gno.land** (Onyx testnet `onyx-1`, Gno `v1.8.0` / `gno = "0.9"`).
+> **Demo Video (64.5s, 1080p30)**: https://youtu.be/snaiwI5kz28
 
 ## Why CairnFold?
 
